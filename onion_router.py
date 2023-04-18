@@ -64,6 +64,8 @@ class OnionRouter:
             print(threading.get_ident())
             print(len(data))
             print(data)
+            if len(data) == 0:
+                break
             cell_header = CellHeader.deserialize(data)
             if cell_header.type == CellType.Create:
                 self.handle_create(ip_addr, client_sock, cell_header)
@@ -73,6 +75,11 @@ class OnionRouter:
                 self.handle_created(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.RelayExtended:
                 self.handle_relay_extended(ip_addr, client_sock, cell_header)
+            elif cell_header.type == CellType.Destroy:
+                self.handle_destroy(ip_addr, client_sock, cell_header)
+                if ip_addr not in self.or_sockets:
+                    break
+
 
     def handle_create(self, ip_addr: bytes,
                       client_sock: socket.socket, cell_header: CellHeader):
@@ -142,6 +149,48 @@ class OnionRouter:
         msg = hdr + body
         sock = self.or_sockets[circuit_state.ip_addresses[0]]
         sock.send(msg)
+
+    def handle_destroy(self, ip_addr: bytes, client_sock: socket.socket, cell_header: CellHeader):
+        # Circuit ID must exist
+        circ_id = cell_header.circ_id
+        assert circ_id in self.circuits
+
+        # Receive the body (nop)
+        cell_body = DestroyCellBody.deserialize(client_sock.recv(cell_header.body_len))
+
+        circuit_state = self.circuits[circ_id]
+
+        # Forward the teardown request if there is anyone down the line
+        if circuit_state.circuit_ids[1] is not None:
+            body = DestroyCellBody().serialize()
+            hdr = CellHeader(THOR_VERSION, CellType.Destroy, circuit_state.circuit_ids[1], len(body)).serialize()
+            msg = hdr + body
+            sock = self.or_sockets[circuit_state.ip_addresses[1]]
+            sock.send(msg)
+
+        circ_ids = circuit_state.circuit_ids
+        ip_addrs = circuit_state.ip_addresses
+
+        # Remove circuit state
+        self.circuits.pop(circ_ids[0])
+        if circ_ids[1] is not None:
+            self.circuits.pop(circ_ids[1])
+
+        close_incoming = True
+        close_outgoing = circ_ids[1] is not None
+        for circuit_state in self.circuits.values():
+            if close_incoming and ip_addrs[0] == circuit_state.ip_addresses[0]:
+                close_incoming = False
+            if close_outgoing and ip_addrs[1] == circuit_state.ip_addresses[1]:
+                close_outgoing = False
+            if not close_incoming and not close_outgoing:
+                break
+        if close_incoming:
+            self.or_sockets[ip_addrs[0]].close()
+            self.or_sockets.pop(ip_addrs[0])
+        if close_outgoing:
+            self.or_sockets[ip_addrs[1]].close()
+            self.or_sockets.pop(ip_addrs[1])
 
     def handle_relay_extend(
             self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):

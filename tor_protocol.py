@@ -167,6 +167,22 @@ class CreatedCellBody:
         return CreatedCellBody(pk, sharedhash, signature)
 
 
+class DestroyCellBody:
+    TotalSize = 0
+
+    def __init__(self):
+        pass
+
+    def serialize(self) -> bytearray:
+        data = bytearray(DestroyCellBody.TotalSize)
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "DestroyCellBody":
+        assert len(data) == DestroyCellBody.TotalSize
+        return DestroyCellBody()
+
+
 class RelayExtendCellBody:
     NextOrIpBegin = 0
     NextOrIpEnd = 4

@@ -85,3 +85,9 @@ print("OR 3 public key:", b64encode(cell_body.pk))
 print("OR 3 hash of the session key:", b64encode(cell_body.hash))
 print("OR 3 signature:", b64encode(cell_body.signature))
 print("My hash of OR 3 session key:", b64encode(hash_shared_secret))
+
+# Now tear down the circuit
+body = DestroyCellBody().serialize()
+hdr = CellHeader(1, CellType.Destroy, circ_id, len(body)).serialize()
+s.send(hdr + body)
+s.close()
