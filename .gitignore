@@ -1,0 +1,8 @@
+# Python cache
+__pycache__/
+
+# VS Code stuff
+.vscode/
+
+# macOS
+.DS_Store
