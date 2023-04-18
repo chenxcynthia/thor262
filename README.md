@@ -20,7 +20,7 @@ In the 4th terminal window, start the client:
 $ python3 client.py
 ```
 
-Sample output:
+Sample client output:
 ```
 OR 1 public key: b'4nX1LOdIt58fArZZW7VzHTwy0oXzzIA+x2TOK1AZ31A='
 OR 1 hash of the session key: b'YHFSrnMw5CA2jw3NibhMqq7lcHPSnWQTez7FYcO3OhU='
