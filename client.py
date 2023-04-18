@@ -1,10 +1,10 @@
-from onion_router import CreateCellBody, CreatedCellBody, CellHeader, CellType, RelayExtendCellBody, RelayExtendedCellBody, add_onion_layer, remove_onion_layer, verify_digest
+import socket
+from base64 import b64encode
 from nacl.public import PrivateKey, PublicKey, Box
 from nacl.encoding import RawEncoder
 from nacl.hash import blake2b
 from nacl.utils import random
-from base64 import b64encode
-import socket
+from tor_protocol import *
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.connect(('127.0.0.1', 50051))
