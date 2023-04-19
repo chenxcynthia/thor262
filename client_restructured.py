@@ -7,45 +7,47 @@ from nacl.utils import random
 from tor_protocol import *
 
 class TorClient:
-    def __init__(self, ip):
+    def __init__(self):
         self.circ_id = random(16)
         self.sess_keys = [None, None, None]
-        self.s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.stage = 0   
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.stage = 0  # which onion router in the circuit the client is making
 
     def create_onion_router(self, ip):
-        # which_or = 1 # or 2, or 3
         sk = PrivateKey.generate()
         pk = sk.public_key
 
-        # connect to server
+        # making the first onion router
         if self.stage == 0:
-            self.s.connect((ip, 50051))
+            self.socket.connect((ip, 50051))
             cell_type = CellType.Create
             body = CreateCellBody(pk.encode()).serialize()
+
+        # making later onion routers
         else:
             next_or_ip = socket.inet_aton(ip)
             cell_type = CellType.RelayExtend
-
             body = RelayExtendCellBody(next_or_ip, pk.encode()).serialize()
-            for j in reversed(range(self.stage)):
+            # add layers in reverse order
+            for j in reversed(range(self.stage)): 
                 body = add_onion_layer(body, self.sess_keys[j])
             
         hdr = CellHeader(1, cell_type, self.circ_id, len(body)).serialize()
-        self.s.send(hdr + body)
-        
+        self.socket.send(hdr + body)
+
         self.stage += 1
         return sk
 
     def receive_created(self, sk):
-        cell_header = CellHeader.deserialize(self.s.recv(CellHeader.TotalSize))
+        cell_header = CellHeader.deserialize(self.socket.recv(CellHeader.TotalSize))
         # assert cell_header.body_len == CreatedCellBody.TotalSize
         
-        cell_body = self.s.recv(cell_header.body_len)
+        cell_body = self.socket.recv(cell_header.body_len)
         if self.stage == 1:
             cell_body = CreatedCellBody.deserialize(cell_body)
         else:
-            for j in range(self.stage):
+            # peel off layers
+            for j in range(self.stage): 
                 cell_body = remove_onion_layer(cell_body, self.sess_keys[j])
             assert len(cell_body) == RelayExtendedCellBody.TotalSize
             assert verify_digest(bytes(cell_body))
@@ -66,20 +68,21 @@ class TorClient:
         for j in reversed(range(3)):
             body = add_onion_layer(body, self.sess_keys[j])
         hdr = CellHeader(1, CellType.RelayBegin, self.circ_id, len(body)).serialize()
-        self.s.send(hdr + body)
+        self.socket.send(hdr + body)
 
     def destroy(self):
         body = DestroyCellBody().serialize()
         hdr = CellHeader(1, CellType.Destroy, self.circ_id, len(body)).serialize()
-        self.s.send(hdr + body)
-        self.s.close()
+        self.socket.send(hdr + body)
+        self.socket.close()
 
 
 # TODO: use command line arguments for the 3 IP addresses
 ip_addr = ['127.0.0.1', '127.0.0.2', '127.0.0.3']
-client = TorClient()
 hostname = 'www.harvard.edu'
 port = 80
+
+client = TorClient()
 
 # Create 3 onion routers
 for i in range(3):
