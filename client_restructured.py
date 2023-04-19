@@ -33,6 +33,8 @@ class TorClient:
             
         hdr = CellHeader(1, cell_type, self.circ_id, len(body)).serialize()
         self.s.send(hdr + body)
+        
+        self.stage += 1
         return sk
 
     def receive_created(self, sk):
