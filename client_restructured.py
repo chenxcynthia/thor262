@@ -35,6 +35,7 @@ class TorClient:
         hdr = CellHeader(1, cell_type, self.circ_id, len(body)).serialize()
         self.socket.send(hdr + body)
 
+        # update "stage" to next one
         self.stage += 1
         return sk
 
@@ -46,7 +47,7 @@ class TorClient:
         if self.stage == 1:
             cell_body = CreatedCellBody.deserialize(cell_body)
         else:
-            # peel off layers
+            # peel off layers in order
             for j in range(self.stage): 
                 cell_body = remove_onion_layer(cell_body, self.sess_keys[j])
             assert len(cell_body) == RelayExtendedCellBody.TotalSize
@@ -79,6 +80,8 @@ class TorClient:
 
 # TODO: use command line arguments for the 3 IP addresses
 ip_addr = ['127.0.0.1', '127.0.0.2', '127.0.0.3']
+
+# Destination website to connect to
 hostname = 'www.harvard.edu'
 port = 80
 
@@ -90,7 +93,7 @@ for i in range(3):
     client.receive_created(sk)
 
 # Send RelayBegin cell to start a TCP connection
-client.begin(hostname, port) # does port need to be passed in as a parameter?
+client.begin(hostname, port) # Question: does port need to be passed in as a parameter?
 
 # Now tear down the circuit
 client.destroy()
