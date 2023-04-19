@@ -86,6 +86,16 @@ print("OR 3 hash of the session key:", b64encode(cell_body.hash))
 print("OR 3 signature:", b64encode(cell_body.signature))
 print("My hash of OR 3 session key:", b64encode(hash_shared_secret))
 
+# Send RelayBegin cell to start a TCP connection
+hostname = 'www.harvard.edu'
+port = 80
+body = RelayBeginCellBody(port, hostname).serialize()
+body = add_onion_layer(body, sess_keys[2])
+body = add_onion_layer(body, sess_keys[1])
+body = add_onion_layer(body, sess_keys[0])
+hdr = CellHeader(1, CellType.RelayBegin, circ_id, len(body)).serialize()
+s.send(hdr + body)
+
 # Now tear down the circuit
 body = DestroyCellBody().serialize()
 hdr = CellHeader(1, CellType.Destroy, circ_id, len(body)).serialize()

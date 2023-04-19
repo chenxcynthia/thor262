@@ -9,6 +9,7 @@ from nacl.utils import random
 from typing import Tuple, Dict, List
 from tor_protocol import *
 
+
 class CircuitState:
     def __init__(self):
         self.ip_addresses: List[bytes] = [None, None]
@@ -79,7 +80,8 @@ class OnionRouter:
                 self.handle_destroy(ip_addr, client_sock, cell_header)
                 if ip_addr not in self.or_sockets:
                     break
-
+            elif cell_header.type == CellType.RelayBegin:
+                self.handle_relay_begin(ip_addr, client_sock, cell_header)
 
     def handle_create(self, ip_addr: bytes,
                       client_sock: socket.socket, cell_header: CellHeader):
@@ -156,14 +158,16 @@ class OnionRouter:
         assert circ_id in self.circuits
 
         # Receive the body (nop)
-        cell_body = DestroyCellBody.deserialize(client_sock.recv(cell_header.body_len))
+        cell_body = DestroyCellBody.deserialize(
+            client_sock.recv(cell_header.body_len))
 
         circuit_state = self.circuits[circ_id]
 
         # Forward the teardown request if there is anyone down the line
         if circuit_state.circuit_ids[1] is not None:
             body = DestroyCellBody().serialize()
-            hdr = CellHeader(THOR_VERSION, CellType.Destroy, circuit_state.circuit_ids[1], len(body)).serialize()
+            hdr = CellHeader(THOR_VERSION, CellType.Destroy,
+                             circuit_state.circuit_ids[1], len(body)).serialize()
             msg = hdr + body
             sock = self.or_sockets[circuit_state.ip_addresses[1]]
             sock.send(msg)
@@ -191,6 +195,32 @@ class OnionRouter:
         if close_outgoing:
             self.or_sockets[ip_addrs[1]].close()
             self.or_sockets.pop(ip_addrs[1])
+
+    def handle_relay_begin(self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):
+        # Circuit ID must already exist
+        circ_id = cell_header.circ_id
+        assert circ_id in self.circuits
+
+        # Receive the body
+        cell_body = client_sock.recv(cell_header.body_len)
+
+        # Peel the onion
+        circuit_state = self.circuits[circ_id]
+        cell_body = remove_onion_layer(cell_body, circuit_state.get_sesskey())
+
+        if not verify_digest(bytes(cell_body)):
+            # The other circuit ID must exist
+            assert circuit_state.circuit_ids[1] is not None
+            # Create the header
+            hdr = CellHeader(THOR_VERSION, CellType.RelayBegin,
+                             circuit_state.circuit_ids[1], len(cell_body)).serialize()
+            msg = hdr + cell_body
+            sock = self.or_sockets[circuit_state.ip_addresses[1]]
+            sock.send(msg)
+        else:
+            cell_body = RelayBeginCellBody.deserialize(cell_body)
+            print("Address of destination: %s:%d" %
+                  (cell_body.hostname, cell_body.port))
 
     def handle_relay_extend(
             self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):

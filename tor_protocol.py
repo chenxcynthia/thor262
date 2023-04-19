@@ -183,6 +183,50 @@ class DestroyCellBody:
         return DestroyCellBody()
 
 
+class RelayBeginCellBody:
+    PortBegin = 0
+    PortSize = 2
+    PortEnd = 2
+
+    HostnameBegin = 2
+
+    DigestSize = 32
+
+    def __init__(self, port: int, hostname: str):
+        if port < 0 or port > 65535:
+            raise ValueError("Invalid port")
+        self.port = port
+        self.hostname = hostname
+        self.digest = compute_digest(self.port.to_bytes(
+            RelayBeginCellBody.PortSize, byteorder='little') + bytes(self.hostname, 'utf-8'))
+
+    def serialize(self) -> bytearray:
+        hostname_bytes = bytes(self.hostname, 'utf-8')
+        hostname_size = len(hostname_bytes)
+        hostname_end = RelayBeginCellBody.HostnameBegin + hostname_size
+        digest_begin = hostname_end
+        digest_end = digest_begin + RelayBeginCellBody.DigestSize
+        total_size = RelayBeginCellBody.PortSize + \
+            hostname_size + RelayBeginCellBody.DigestSize
+        data = bytearray(total_size)
+        data[RelayBeginCellBody.PortBegin:RelayBeginCellBody.PortEnd] = self.port.to_bytes(
+            RelayBeginCellBody.PortSize, byteorder='little')
+        data[RelayBeginCellBody.HostnameBegin:hostname_end] = hostname_bytes
+        data[digest_begin:digest_end] = self.digest
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "RelayBeginCellBody":
+        total_size = len(data)
+        assert total_size >= RelayBeginCellBody.PortSize + RelayBeginCellBody.DigestSize
+        hostname_end = total_size - RelayBeginCellBody.DigestSize
+        port = int.from_bytes(
+            data[RelayBeginCellBody.PortBegin:RelayBeginCellBody.PortEnd], byteorder='little')
+        hostname = str(
+            data[RelayBeginCellBody.HostnameBegin:hostname_end], 'utf-8')
+        return RelayBeginCellBody(port, hostname)
+
+
 class RelayExtendCellBody:
     NextOrIpBegin = 0
     NextOrIpEnd = 4
