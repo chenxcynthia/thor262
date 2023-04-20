@@ -34,9 +34,7 @@ class TorClient:
             
         hdr = CellHeader(1, cell_type, self.circ_id, len(body)).serialize()
         self.socket.send(hdr + body)
-
-        # update "stage" to next one
-        self.stage += 1
+        
         return sk
 
     def receive_created(self, sk):
@@ -44,11 +42,13 @@ class TorClient:
         # assert cell_header.body_len == CreatedCellBody.TotalSize
         
         cell_body = self.socket.recv(cell_header.body_len)
-        if self.stage == 1:
+        if self.stage == 0:
             cell_body = CreatedCellBody.deserialize(cell_body)
         else:
             # peel off layers in order
             for j in range(self.stage): 
+                print('removing layer ', j)
+                print('sesion key', self.sess_keys[j])
                 cell_body = remove_onion_layer(cell_body, self.sess_keys[j])
             assert len(cell_body) == RelayExtendedCellBody.TotalSize
             assert verify_digest(bytes(cell_body))
@@ -59,10 +59,15 @@ class TorClient:
         self.sess_keys[self.stage] = session_key
         hash_shared_secret = blake2b(session_key, digest_size=32, person=b"THOR", encoder=RawEncoder)
 
-        print("OR {self.stage} public key:", b64encode(cell_body.pk))
-        print("OR {self.stage} hash of the session key:", b64encode(cell_body.hash))
-        print("OR {self.stage} signature:", b64encode(cell_body.signature))
-        print("My hash of OR {self.stage} session key:", b64encode(hash_shared_secret))
+        # update "stage" to next one
+        self.stage += 1
+
+        print(f"OR {self.stage} public key:", b64encode(cell_body.pk))
+        print(f"OR {self.stage} hash of the session key:", b64encode(cell_body.hash))
+        print(f"OR {self.stage} signature:", b64encode(cell_body.signature))
+        print(f"My hash of OR {self.stage} session key:", b64encode(hash_shared_secret))
+
+        
 
     def begin(self, hostname, port):
         body = RelayBeginCellBody(port, hostname).serialize()
