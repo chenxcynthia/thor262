@@ -28,8 +28,10 @@ class TorClient:
             next_or_ip = socket.inet_aton(ip)
             cell_type = CellType.RelayExtend
             body = RelayExtendCellBody(next_or_ip, pk.encode()).serialize()
+            
             # add layers in reverse order
             for j in reversed(range(self.stage)): 
+                # print('adding layer', j)
                 body = add_onion_layer(body, self.sess_keys[j])
             
         hdr = CellHeader(1, cell_type, self.circ_id, len(body)).serialize()
@@ -47,9 +49,9 @@ class TorClient:
         else:
             # peel off layers in order
             for j in range(self.stage): 
-                print('removing layer ', j)
-                print('sesion key', self.sess_keys[j])
-                cell_body = remove_onion_layer(cell_body, self.sess_keys[j])
+                # print('removing layer ', j)
+                # print('sesion key', self.sess_keys[j])
+                cell_body = remove_onion_layer(bytes(cell_body), self.sess_keys[j])
             assert len(cell_body) == RelayExtendedCellBody.TotalSize
             assert verify_digest(bytes(cell_body))
             cell_body = RelayExtendedCellBody.deserialize(cell_body)
