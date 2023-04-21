@@ -16,6 +16,9 @@ class CircuitState:
         self.circuit_ids: List[bytes] = [None, None]
         self.privkey: PrivateKey = None
         self.pubkey: PublicKey = None
+        self.destination_hostname: str = None
+        self.destination_port: int = None
+        self.destination_socket: socket.socket = None
 
     def get_sesskey(self) -> bytes:
         sesskey = None
@@ -40,7 +43,7 @@ class OnionRouter:
         self.port = port
         self.master_key = master_key
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        # Mapping from sockets to IPs
+        # Mapping from IPs to sockets
         self.or_sockets: Dict[bytes, socket.socket] = {}
         # Per-circuit ID state
         self.circuits: Dict[bytes, CircuitState] = {}
@@ -82,6 +85,8 @@ class OnionRouter:
                     break
             elif cell_header.type == CellType.RelayBegin:
                 self.handle_relay_begin(ip_addr, client_sock, cell_header)
+            elif cell_header.type == CellType.RelayConnected:
+                self.handle_relay_connected(ip_addr, client_sock, cell_header)
 
     def handle_create(self, ip_addr: bytes,
                       client_sock: socket.socket, cell_header: CellHeader):
@@ -172,6 +177,10 @@ class OnionRouter:
             sock = self.or_sockets[circuit_state.ip_addresses[1]]
             sock.send(msg)
 
+        # Close any possible destination connection
+        if circuit_state.destination_socket is not None:
+            circuit_state.destination_socket.close()
+
         circ_ids = circuit_state.circuit_ids
         ip_addrs = circuit_state.ip_addresses
 
@@ -218,9 +227,50 @@ class OnionRouter:
             sock = self.or_sockets[circuit_state.ip_addresses[1]]
             sock.send(msg)
         else:
+            # There must not be a connection already
+            assert circuit_state.destination_socket is None
             cell_body = RelayBeginCellBody.deserialize(cell_body)
-            print("Address of destination: %s:%d" %
-                  (cell_body.hostname, cell_body.port))
+            new_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            try:
+                new_sock.connect((cell_body.hostname, cell_body.port))
+                circuit_state.destination_socket = new_sock
+                circuit_state.destination_hostname = cell_body.hostname
+                circuit_state.destination_port = cell_body.port
+                print("Connecting to %s:%d successful" %
+                      (cell_body.hostname, cell_body.port))
+                status = 0
+            except:
+                print("Connecting to %s:%d failed" %
+                      (cell_body.hostname, cell_body.port))
+                status = 1
+            cell_body = RelayConnectedCellBody(status).serialize()
+            cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
+            hdr = CellHeader(THOR_VERSION, CellType.RelayConnected,
+                             circuit_state.circuit_ids[0], len(cell_body)).serialize()
+            msg = hdr + cell_body
+            sock = self.or_sockets[circuit_state.ip_addresses[0]]
+            sock.send(msg)
+
+    def handle_relay_connected(self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):
+        # Circuit ID must already exist
+        circ_id = cell_header.circ_id
+        assert circ_id in self.circuits
+
+        # Receive the body
+        cell_body = client_sock.recv(cell_header.body_len)
+
+        # Add onion layer
+        circuit_state = self.circuits[circ_id]
+        cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
+
+        # Create header
+        hdr = CellHeader(THOR_VERSION, CellType.RelayConnected,
+                         circuit_state.circuit_ids[0], len(cell_body)).serialize()
+
+        # Send the message
+        msg = hdr + cell_body
+        sock = self.or_sockets[circuit_state.ip_addresses[0]]
+        sock.send(msg)
 
     def handle_relay_extend(
             self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):

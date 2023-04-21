@@ -227,6 +227,39 @@ class RelayBeginCellBody:
         return RelayBeginCellBody(port, hostname)
 
 
+class RelayConnectedCellBody:
+    StatusBegin = 0
+    StatusSize = 2
+    StatusEnd = 2
+
+    DigestBegin = 2
+    DigestSize = 32
+    DigestEnd = 34
+
+    TotalSize = 34
+
+    def __init__(self, status: int):
+        if status < 0 or status > 65535:
+            raise ValueError("Invalid status")
+        self.status = status
+        self.digest = compute_digest(self.status.to_bytes(
+            RelayConnectedCellBody.StatusSize, byteorder='little'))
+
+    def serialize(self) -> bytearray:
+        data = bytearray(RelayConnectedCellBody.TotalSize)
+        data[RelayConnectedCellBody.StatusBegin:RelayConnectedCellBody.StatusEnd] = self.status.to_bytes(
+            RelayConnectedCellBody.StatusSize, byteorder='little')
+        data[RelayConnectedCellBody.DigestBegin:RelayConnectedCellBody.DigestEnd] = self.digest
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "RelayConnectedCellBody":
+        assert len(data) == RelayConnectedCellBody.TotalSize
+        status = int.from_bytes(
+            data[RelayConnectedCellBody.StatusBegin:RelayConnectedCellBody.StatusEnd], byteorder='little')
+        return RelayConnectedCellBody(status)
+
+
 class RelayExtendCellBody:
     NextOrIpBegin = 0
     NextOrIpEnd = 4
