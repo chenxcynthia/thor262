@@ -42,10 +42,10 @@ class TorClient:
 
     def receive_created(self, sk):
         cell_header = CellHeader.deserialize(
-            self.socket.recv(CellHeader.TotalSize))
+            recv_all(self.socket, CellHeader.TotalSize))
         # assert cell_header.body_len == CreatedCellBody.TotalSize
 
-        cell_body = self.socket.recv(cell_header.body_len)
+        cell_body = recv_all(self.socket, cell_header.body_len)
         if self.stage == 0:
             cell_body = CreatedCellBody.deserialize(cell_body)
         else:
@@ -86,13 +86,31 @@ class TorClient:
 
     def receive_connected(self) -> bool:
         cell_header = CellHeader.deserialize(
-            self.socket.recv(CellHeader.TotalSize))
-        cell_body = self.socket.recv(cell_header.body_len)
+            recv_all(self.socket, CellHeader.TotalSize))
+        cell_body = recv_all(self.socket, cell_header.body_len)
         for j in range(self.stage):
             cell_body = remove_onion_layer(bytes(cell_body), self.sess_keys[j])
         assert verify_digest(bytes(cell_body))
         cell_body = RelayConnectedCellBody.deserialize(cell_body)
         return cell_body.status == 0
+
+    def send_data(self, data: bytes):
+        cell_body = RelayDataCellBody(data).serialize()
+        for j in reversed(range(3)):
+            cell_body = add_onion_layer(cell_body, self.sess_keys[j])
+        cell_header = CellHeader(
+            THOR_VERSION, CellType.RelayData, self.circ_id, len(cell_body)).serialize()
+        self.socket.send(cell_header + cell_body)
+
+    def recv_data(self) -> bytes:
+        cell_header = CellHeader.deserialize(
+            recv_all(self.socket, CellHeader.TotalSize))
+        cell_body = recv_all(self.socket, cell_header.body_len)
+        for j in range(self.stage):
+            cell_body = remove_onion_layer(bytes(cell_body), self.sess_keys[j])
+        assert verify_digest(bytes(cell_body))
+        cell_body = RelayDataCellBody.deserialize(cell_body)
+        return cell_body.data
 
     def destroy(self):
         body = DestroyCellBody().serialize()
@@ -107,7 +125,7 @@ ip_addr = ['127.0.0.1', '127.0.0.2', '127.0.0.3']
 
 # Destination website to connect to
 hostname = 'www.harvard.edu'
-port = 80
+port = 443
 
 client = TorClient()
 
@@ -123,6 +141,11 @@ if (client.receive_connected()):
     print("Successfullly connected to %s:%d" % (hostname, port))
 else:
     print("Connection to %s:%d failed" % (hostname, port))
+
+print("Sending a GET request")
+client.send_data(b"GET / HTTP/1.1\r\nHost:www.harvard.edu\r\n\r\n")
+data = client.recv_data()
+print("First 100 characters of response:", data[:100])
 
 # Now tear down the circuit
 client.destroy()

@@ -1,4 +1,5 @@
 import socket
+import ssl
 import sys
 import threading
 from nacl.public import PrivateKey, PublicKey, Box
@@ -64,7 +65,7 @@ class OnionRouter:
         assert ip_addr not in self.or_sockets
         self.or_sockets[ip_addr] = client_sock
         while True:
-            data = client_sock.recv(CellHeader.TotalSize)
+            data = recv_all(client_sock, CellHeader.TotalSize)
             print(threading.get_ident())
             print(len(data))
             print(data)
@@ -87,11 +88,13 @@ class OnionRouter:
                 self.handle_relay_begin(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.RelayConnected:
                 self.handle_relay_connected(ip_addr, client_sock, cell_header)
+            elif cell_header.type == CellType.RelayData:
+                self.handle_relay_data(ip_addr, client_sock, cell_header)
 
     def handle_create(self, ip_addr: bytes,
                       client_sock: socket.socket, cell_header: CellHeader):
         cell_body = CreateCellBody.deserialize(
-            client_sock.recv(cell_header.body_len))
+            recv_all(client_sock, cell_header.body_len))
 
         circ_id = cell_header.circ_id
         # This circuit ID doesn't already exist
@@ -130,7 +133,7 @@ class OnionRouter:
         response_data = response_cell.serialize()
         hdr = CellHeader(THOR_VERSION, CellType.Created,
                          circ_id, len(response_data)).serialize()
-        client_sock.send(hdr + response_data)
+        send_all(client_sock, hdr + response_data)
 
     def handle_created(self, ip_addr: bytes, client_sock: socket.socket, cell_header: CellHeader):
         # Circuit ID must already exist
@@ -139,7 +142,7 @@ class OnionRouter:
 
         # Receive the body
         cell_body = CreatedCellBody.deserialize(
-            client_sock.recv(cell_header.body_len))
+            recv_all(client_sock, cell_header.body_len))
 
         circuit_state = self.circuits[circ_id]
 
@@ -155,7 +158,7 @@ class OnionRouter:
         # Send the message
         msg = hdr + body
         sock = self.or_sockets[circuit_state.ip_addresses[0]]
-        sock.send(msg)
+        send_all(sock, msg)
 
     def handle_destroy(self, ip_addr: bytes, client_sock: socket.socket, cell_header: CellHeader):
         # Circuit ID must exist
@@ -164,7 +167,7 @@ class OnionRouter:
 
         # Receive the body (nop)
         cell_body = DestroyCellBody.deserialize(
-            client_sock.recv(cell_header.body_len))
+            recv_all(client_sock, cell_header.body_len))
 
         circuit_state = self.circuits[circ_id]
 
@@ -175,7 +178,7 @@ class OnionRouter:
                              circuit_state.circuit_ids[1], len(body)).serialize()
             msg = hdr + body
             sock = self.or_sockets[circuit_state.ip_addresses[1]]
-            sock.send(msg)
+            send_all(sock, msg)
 
         # Close any possible destination connection
         if circuit_state.destination_socket is not None:
@@ -205,13 +208,69 @@ class OnionRouter:
             self.or_sockets[ip_addrs[1]].close()
             self.or_sockets.pop(ip_addrs[1])
 
+    def handle_relay_data(self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):
+        # Circuit ID must already exist
+        circ_id = cell_header.circ_id
+        assert circ_id in self.circuits
+
+        # Receive the body
+        cell_body = recv_all(client_sock, cell_header.body_len)
+
+        circuit_state = self.circuits[circ_id]
+
+        # If the message is coming from downstream, just pass it along
+        if circ_id == circuit_state.circuit_ids[1]:
+            # Add onion layer
+            circuit_state = self.circuits[circ_id]
+            cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
+
+            # Create header
+            hdr = CellHeader(THOR_VERSION, CellType.RelayData,
+                             circuit_state.circuit_ids[0], len(cell_body)).serialize()
+
+            # Send the message
+            msg = hdr + cell_body
+            sock = self.or_sockets[circuit_state.ip_addresses[0]]
+            send_all(sock, msg)
+            return
+
+        # Peel off the onion
+        cell_body = remove_onion_layer(cell_body, circuit_state.get_sesskey())
+
+        # If the message is not for us, pass it downstream
+        if not verify_digest(bytes(cell_body)):
+            # The other circuit ID must exist
+            assert circuit_state.circuit_ids[1] is not None
+            # Create the header
+            hdr = CellHeader(THOR_VERSION, CellType.RelayData,
+                             circuit_state.circuit_ids[1], len(cell_body)).serialize()
+            msg = hdr + cell_body
+            sock = self.or_sockets[circuit_state.ip_addresses[1]]
+            send_all(sock, msg)
+        else:
+            # There must be a destination already
+            assert circuit_state.destination_socket is not None
+            # Send the data to the destination
+            cell_body = RelayDataCellBody.deserialize(cell_body)
+            send_all(circuit_state.destination_socket, cell_body.data)
+            # Receive a response
+            response = recv_all(circuit_state.destination_socket, 1073741824)
+            # Send it upstream
+            cell_body = RelayDataCellBody(response).serialize()
+            cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
+            hdr = CellHeader(THOR_VERSION, CellType.RelayData,
+                             circuit_state.circuit_ids[0], len(cell_body)).serialize()
+            msg = hdr + cell_body
+            sock = self.or_sockets[circuit_state.ip_addresses[0]]
+            send_all(sock, msg)
+
     def handle_relay_begin(self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):
         # Circuit ID must already exist
         circ_id = cell_header.circ_id
         assert circ_id in self.circuits
 
         # Receive the body
-        cell_body = client_sock.recv(cell_header.body_len)
+        cell_body = recv_all(client_sock, cell_header.body_len)
 
         # Peel the onion
         circuit_state = self.circuits[circ_id]
@@ -225,12 +284,17 @@ class OnionRouter:
                              circuit_state.circuit_ids[1], len(cell_body)).serialize()
             msg = hdr + cell_body
             sock = self.or_sockets[circuit_state.ip_addresses[1]]
-            sock.send(msg)
+            send_all(sock, msg)
         else:
             # There must not be a connection already
             assert circuit_state.destination_socket is None
             cell_body = RelayBeginCellBody.deserialize(cell_body)
             new_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # Special-case for HTTPS
+            if cell_body.port == 443:
+                context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
+                new_sock = context.wrap_socket(new_sock)
+            new_sock.settimeout(2)
             try:
                 new_sock.connect((cell_body.hostname, cell_body.port))
                 circuit_state.destination_socket = new_sock
@@ -249,7 +313,7 @@ class OnionRouter:
                              circuit_state.circuit_ids[0], len(cell_body)).serialize()
             msg = hdr + cell_body
             sock = self.or_sockets[circuit_state.ip_addresses[0]]
-            sock.send(msg)
+            send_all(sock, msg)
 
     def handle_relay_connected(self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):
         # Circuit ID must already exist
@@ -257,7 +321,7 @@ class OnionRouter:
         assert circ_id in self.circuits
 
         # Receive the body
-        cell_body = client_sock.recv(cell_header.body_len)
+        cell_body = recv_all(client_sock, cell_header.body_len)
 
         # Add onion layer
         circuit_state = self.circuits[circ_id]
@@ -270,7 +334,7 @@ class OnionRouter:
         # Send the message
         msg = hdr + cell_body
         sock = self.or_sockets[circuit_state.ip_addresses[0]]
-        sock.send(msg)
+        send_all(sock, msg)
 
     def handle_relay_extend(
             self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):
@@ -279,7 +343,7 @@ class OnionRouter:
         assert circ_id in self.circuits
 
         # Receive the body
-        cell_body = client_sock.recv(cell_header.body_len)
+        cell_body = recv_all(client_sock, cell_header.body_len)
 
         # Peel the onion
         circuit_state = self.circuits[circ_id]
@@ -292,7 +356,7 @@ class OnionRouter:
                              circuit_state.circuit_ids[1], len(cell_body)).serialize()
             msg = hdr + cell_body
             sock = self.or_sockets[circuit_state.ip_addresses[1]]
-            sock.send(msg)
+            send_all(sock, msg)
         else:
             # The other circuit ID must not exist
             assert circuit_state.circuit_ids[1] is None
@@ -325,7 +389,7 @@ class OnionRouter:
                              circuit_state.circuit_ids[1], len(body)).serialize()
 
             msg = hdr + body
-            sock.send(msg)
+            send_all(sock, msg)
 
     def handle_relay_extended(self, ip_addr: str, client_sock: socket.socket, cell_header: CellHeader):
         # Circuit ID must already exist
@@ -333,7 +397,7 @@ class OnionRouter:
         assert circ_id in self.circuits
 
         # Receive the body
-        cell_body = client_sock.recv(cell_header.body_len)
+        cell_body = recv_all(client_sock, cell_header.body_len)
 
         # Add onion layer
         circuit_state = self.circuits[circ_id]
@@ -346,7 +410,7 @@ class OnionRouter:
         # Send the message
         msg = hdr + cell_body
         sock = self.or_sockets[circuit_state.ip_addresses[0]]
-        sock.send(msg)
+        send_all(sock, msg)
 
 
 def main(argv):

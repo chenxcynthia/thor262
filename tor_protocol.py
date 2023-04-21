@@ -2,6 +2,7 @@ from enum import IntEnum
 from nacl.secret import SecretBox
 from nacl.hash import blake2b
 from nacl.encoding import RawEncoder
+import socket
 
 THOR_VERSION = 1
 THOR_PORT = 50051
@@ -24,6 +25,25 @@ def compute_digest(data: bytes) -> bytes:
 def verify_digest(data: bytes) -> bool:
     assert len(data) >= 32
     return blake2b(data[:-32], digest_size=32, person=b"THOR", encoder=RawEncoder) == data[-32:]
+
+
+def send_all(sock: socket.socket, data: bytes):
+    sent = 0
+    while sent < len(data):
+        sent = sent + sock.send(data[sent:])
+
+
+def recv_all(sock: socket.socket, length: int) -> bytes:
+    data = b""
+    while len(data) < length:
+        try:
+            chunk = sock.recv(length - len(data))
+            if len(chunk) == 0:
+                break
+        except socket.timeout:
+            break
+        data += chunk
+    return data
 
 
 class CellType(IntEnum):
@@ -181,6 +201,35 @@ class DestroyCellBody:
     def deserialize(data: bytearray) -> "DestroyCellBody":
         assert len(data) == DestroyCellBody.TotalSize
         return DestroyCellBody()
+
+
+class RelayDataCellBody:
+    DataBegin = 0
+
+    DigestSize = 32
+
+    def __init__(self, data: bytes):
+        self.data = data
+        self.digest = compute_digest(self.data)
+
+    def serialize(self) -> bytearray:
+        data_size = len(self.data)
+        data_end = RelayDataCellBody.DataBegin + data_size
+        digest_begin = data_end
+        digest_end = digest_begin + RelayDataCellBody.DigestSize
+        total_size = data_size + RelayDataCellBody.DigestSize
+        data = bytearray(total_size)
+        data[RelayDataCellBody.DataBegin:data_end] = self.data
+        data[digest_begin:digest_end] = self.digest
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "RelayDataCellBody":
+        total_size = len(data)
+        assert total_size >= RelayDataCellBody.DigestSize
+        data_end = total_size - RelayDataCellBody.DigestSize
+        this_data = data[RelayDataCellBody.DataBegin:data_end]
+        return RelayDataCellBody(bytes(this_data))
 
 
 class RelayBeginCellBody:
