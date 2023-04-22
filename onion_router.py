@@ -3,7 +3,7 @@ import ssl
 import sys
 import threading
 from nacl.public import PrivateKey, PublicKey, Box
-from nacl.signing import SigningKey
+from nacl.signing import SigningKey, VerifyKey
 from nacl.hash import blake2b
 from nacl.encoding import RawEncoder
 from nacl.utils import random
@@ -37,11 +37,7 @@ class CircuitState:
 
 
 class OnionRouter:
-    def __init__(self, ip: str, port: int, master_key: SigningKey):
-        self.ip = ip
-        if port < 0 or port > 65535:
-            raise ValueError
-        self.port = port
+    def __init__(self, master_key: SigningKey):
         self.master_key = master_key
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         # Mapping from IPs to sockets
@@ -57,6 +53,52 @@ class OnionRouter:
             client_sock, addr = self.sock.accept()
             threading.Thread(target=self.handle_client,
                              args=(client_sock, addr)).start()
+
+    def join_directory(self, directory_key: VerifyKey, directory_ip: str) -> int:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((directory_ip, THOR_PORT))
+
+        # Store our public key (we are the initiator)
+        init_pk = self.master_key.verify_key.encode()
+        # Generate nonce for INIT
+        init_nonce = random(32)
+        # Send INIT
+        cell_body = DirectoryChallengeInitCellBody(
+            init_pk, init_nonce).serialize()
+        cell_header = CellHeader(
+            THOR_VERSION, CellType.DirectoryChallengeInit, bytes(16), len(cell_body)).serialize()
+        send_all(sock, cell_header + cell_body)
+
+        # Recieve the challenge request
+        cell_header = CellHeader.deserialize(
+            recv_all(sock, CellHeader.TotalSize))
+        assert cell_header.type == CellType.DirectoryChallengeRequest
+        cell_body = DirectoryChallengeRequestCellBody.deserialize(
+            recv_all(sock, cell_header.body_len))
+        # Verify the challenger's signature
+        challenger_signature = cell_body.signature
+        try:
+            directory_key.verify(init_nonce, challenger_signature)
+        except:
+            sock.close()
+            return -1
+        # Prove to the challenger that we hold the signing key
+        challenger_nonce = cell_body.nonce
+        init_signature = self.master_key.sign(challenger_nonce).signature
+        # Send the challenge response
+        cell_body = DirectoryChallengeResponseCellBody(
+            init_signature).serialize()
+        cell_header = CellHeader(
+            THOR_VERSION, CellType.DirectoryChallengeResponse, bytes(16), len(cell_body)).serialize()
+        send_all(sock, cell_header + cell_body)
+
+        # Receive ACK
+        cell_header = CellHeader.deserialize(
+            recv_all(sock, CellHeader.TotalSize))
+        assert cell_header.type == CellType.DirectoryChallengeAck
+        cell_body = DirectoryChallengeAckCellBody.deserialize(
+            recv_all(sock, cell_header.body_len))
+        return cell_body.status
 
     def handle_client(self, client_sock: socket.socket, addr: Tuple[str, int]):
         print("Accepted connection from %s:%d" % (addr[0], addr[1]))
@@ -415,12 +457,22 @@ class OnionRouter:
 
 def main(argv):
     if len(argv) != 4:
-        print("usage: %s <IP ADDRESS> <PORT> <SIGNING KEY FILE>" % argv[0])
+        print(
+            "usage: %s <DIRECTORY SERVER IP ADDRESS> <DIRECTORY SERVER PUBLIC KEY> <PRIVATE KEY FILE>" % argv[0])
         return 1
+    with open(argv[2], "rb") as keyfile:
+        ds_publickey = keyfile.read(32)
     with open(argv[3], "rb") as keyfile:
         signingkey = keyfile.read(32)
-    orouter = OnionRouter(argv[1], int(argv[2]), SigningKey(signingkey))
-    orouter.serve()
+    orouter = OnionRouter(SigningKey(signingkey))
+    status = orouter.join_directory(VerifyKey(ds_publickey), argv[1])
+    if status == 0:
+        print("Successfully joined the DS")
+    elif status == -1:
+        print("Failed to verify the DS's signature")
+    elif status == 1:
+        print("DS refused the join")
+    # orouter.serve()
 
 
 if __name__ == "__main__":

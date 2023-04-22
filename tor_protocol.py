@@ -2,7 +2,9 @@ from enum import IntEnum
 from nacl.secret import SecretBox
 from nacl.hash import blake2b
 from nacl.encoding import RawEncoder
+from nacl.utils import random
 import socket
+from typing import List
 
 THOR_VERSION = 1
 THOR_PORT = 50051
@@ -59,8 +61,14 @@ class CellType(IntEnum):
     RelayTeardown = 6,
     RelayConnected = 7,
     RelayExtend = 8,
-    RelayExtended = 9
-    EndCellType = 10
+    RelayExtended = 9,
+    DirectoryChallengeInit = 10,
+    DirectoryChallengeRequest = 11,
+    DirectoryChallengeResponse = 12,
+    DirectoryChallengeAck = 13,
+    DirectoryRetrieveRequest = 14,
+    DirectoryRetrieveResponse = 15,
+    EndCellType = 16
 
 
 class CellHeader:
@@ -406,3 +414,225 @@ class RelayExtendedCellBody:
             data[RelayExtendedCellBody.SignatureBegin:RelayExtendedCellBody.SignatureEnd])
         digest = data[RelayExtendedCellBody.DigestBegin:RelayExtendedCellBody.DigestEnd]
         return RelayExtendedCellBody(pk, sharedhash, signature)
+
+
+class DirectoryChallengeInitCellBody:
+    PublicKeyBegin = 0
+    PublicKeySize = 32
+    PublicKeyEnd = 32
+
+    NonceBegin = 32
+    NonceSize = 32
+    NonceEnd = 64
+
+    TotalSize = 64
+
+    def __init__(self, pk: bytes, nonce: bytes):
+        if len(pk) != 32:
+            raise ValueError("Invalid public key length")
+        self.pk = pk
+        if len(nonce) != 32:
+            raise ValueError("Invalid nonce length")
+        self.nonce = nonce
+
+    def serialize(self) -> bytearray:
+        data = bytearray(DirectoryChallengeInitCellBody.TotalSize)
+        data[DirectoryChallengeInitCellBody.PublicKeyBegin:
+             DirectoryChallengeInitCellBody.PublicKeyEnd] = self.pk
+        data[DirectoryChallengeInitCellBody.NonceBegin:
+             DirectoryChallengeInitCellBody.NonceEnd] = self.nonce
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "DirectoryChallengeInitCellBody":
+        assert len(data) == DirectoryChallengeInitCellBody.TotalSize
+        pk = bytes(
+            data[DirectoryChallengeInitCellBody.PublicKeyBegin:DirectoryChallengeInitCellBody.PublicKeyEnd])
+        nonce = bytes(
+            data[DirectoryChallengeInitCellBody.NonceBegin:DirectoryChallengeInitCellBody.NonceEnd])
+        return DirectoryChallengeInitCellBody(pk, nonce)
+
+
+class DirectoryChallengeRequestCellBody:
+    NonceBegin = 0
+    NonceSize = 32
+    NonceEnd = 32
+
+    SignatureBegin = 32
+    SignatureSize = 64
+    SignatureEnd = 96
+
+    TotalSize = 96
+
+    def __init__(self, nonce: bytes, signature: bytes):
+        if len(nonce) != 32:
+            raise ValueError("Invalid signature length")
+        self.nonce = nonce
+        if len(signature) != 64:
+            raise ValueError("Invalid signature length")
+        self.signature = signature
+
+    def serialize(self) -> bytearray:
+        data = bytearray(DirectoryChallengeRequestCellBody.TotalSize)
+        data[DirectoryChallengeRequestCellBody.NonceBegin:
+             DirectoryChallengeRequestCellBody.NonceEnd] = self.nonce
+        data[DirectoryChallengeRequestCellBody.SignatureBegin:
+             DirectoryChallengeRequestCellBody.SignatureEnd] = self.signature
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "DirectoryChallengeRequestCellBody":
+        assert len(data) == DirectoryChallengeRequestCellBody.TotalSize
+        nonce = bytes(
+            data[DirectoryChallengeRequestCellBody.NonceBegin:DirectoryChallengeRequestCellBody.NonceEnd])
+        signature = bytes(
+            data[DirectoryChallengeRequestCellBody.SignatureBegin:DirectoryChallengeRequestCellBody.SignatureEnd])
+        return DirectoryChallengeRequestCellBody(nonce, signature)
+
+
+class DirectoryChallengeResponseCellBody:
+    SignatureBegin = 0
+    SignatureSize = 64
+    SignatureEnd = 64
+
+    TotalSize = 64
+
+    def __init__(self, signature: bytes):
+        if len(signature) != 64:
+            raise ValueError("Invalid signature length")
+        self.signature = signature
+
+    def serialize(self) -> bytearray:
+        data = bytearray(DirectoryChallengeResponseCellBody.TotalSize)
+        data[DirectoryChallengeResponseCellBody.SignatureBegin:
+             DirectoryChallengeResponseCellBody.SignatureEnd] = self.signature
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "DirectoryChallengeResponseCellBody":
+        assert len(data) == DirectoryChallengeResponseCellBody.TotalSize
+        signature = bytes(
+            data[DirectoryChallengeResponseCellBody.SignatureBegin:DirectoryChallengeResponseCellBody.SignatureEnd])
+        return DirectoryChallengeResponseCellBody(signature)
+
+
+class DirectoryChallengeAckCellBody:
+    StatusBegin = 0
+    StatusSize = 2
+    StatusEnd = 2
+
+    TotalSize = 2
+
+    def __init__(self, status: int):
+        if status < 0 or status > 65535:
+            raise ValueError("Invalid status")
+        self.status = status
+
+    def serialize(self) -> bytearray:
+        data = bytearray(DirectoryChallengeAckCellBody.TotalSize)
+        data[DirectoryChallengeAckCellBody.StatusBegin:DirectoryChallengeAckCellBody.StatusEnd] = self.status.to_bytes(
+            DirectoryChallengeAckCellBody.StatusSize, byteorder='little')
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "DirectoryChallengeAckCellBody":
+        assert len(data) == DirectoryChallengeAckCellBody.TotalSize
+        status = int.from_bytes(
+            data[DirectoryChallengeAckCellBody.StatusBegin:DirectoryChallengeAckCellBody.StatusEnd], byteorder='little')
+        return DirectoryChallengeAckCellBody(status)
+
+
+class DirectoryRetrieveRequestCellBody:
+    NonceBegin = 0
+    NonceSize = 32
+    NonceEnd = 32
+
+    TotalSize = 32
+
+    def __init__(self, nonce: bytes):
+        if len(nonce) != 32:
+            raise ValueError("Invalid signature length")
+        self.nonce = nonce
+
+    def serialize(self) -> bytearray:
+        data = bytearray(DirectoryRetrieveRequestCellBody.TotalSize)
+        data[DirectoryRetrieveRequestCellBody.NonceBegin:
+             DirectoryRetrieveRequestCellBody.NonceEnd] = self.nonce
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "DirectoryRetrieveRequestCellBody":
+        assert len(data) == DirectoryRetrieveRequestCellBody.TotalSize
+        nonce = bytes(
+            data[DirectoryRetrieveRequestCellBody.NonceBegin:DirectoryRetrieveRequestCellBody.NonceEnd])
+        return DirectoryRetrieveRequestCellBody(nonce)
+
+
+class DirectoryRetrieveResponseCellBody:
+    ListLenBegin = 0
+    ListLenSize = 4
+    ListLenEnd = 4
+
+    PairBegin = 4
+    OrIpSize = 4
+    OrPkSize = 32
+    PairSize = OrIpSize + OrPkSize
+
+    SignatureSize = 64
+
+    def __init__(self, or_ips: List[bytes], pks: List[bytes], signature: bytes):
+        if len(or_ips) != len(pks):
+            raise ValueError("Each OR must have a public key")
+        if any([x for x in or_ips if len(x) != 4]):
+            raise ValueError("OR IPs must be 4 bytes")
+        self.or_ips = or_ips
+        if any([x for x in pks if len(x) != 32]):
+            raise ValueError("OR public keys must be 32 bytes")
+        self.pks = pks
+        if len(signature) != 64:
+            raise ValueError("Invalid signature length")
+        self.signature = signature
+
+    def serialize(self) -> bytearray:
+        total_size = DirectoryRetrieveResponseCellBody.ListLenSize + \
+            len(self.or_ips) * DirectoryRetrieveResponseCellBody.PairSize
+        data = bytearray(total_size)
+        data[DirectoryRetrieveResponseCellBody.ListLenBegin:DirectoryRetrieveResponseCellBody.ListLenEnd] = len(
+            self.or_ips).to_bytes(DirectoryRetrieveResponseCellBody.ListLenSize, byteorder='little')
+        for i in range(len(self.or_ips)):
+            ip_begin = DirectoryRetrieveResponseCellBody.PairBegin + \
+                i * DirectoryRetrieveResponseCellBody.PairSize
+            ip_end = ip_begin + DirectoryRetrieveResponseCellBody.OrIpSize
+            pk_begin = ip_end
+            pk_end = pk_begin + DirectoryRetrieveResponseCellBody.OrPkSize
+            data[ip_begin:ip_end] = self.or_ips[i]
+            data[pk_begin:pk_end] = self.pks[i]
+        signature_begin = DirectoryRetrieveResponseCellBody.PairBegin + \
+            len(self.or_ips) * DirectoryRetrieveResponseCellBody.PairSize
+        signature_end = signature_begin + DirectoryRetrieveResponseCellBody.SignatureSize
+        data[signature_begin:signature_end] = self.signature
+        return data
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "DirectoryRetrieveResponseCellBody":
+        or_ips: List[bytes] = []
+        pks: List[bytes] = []
+        assert len(data) >= DirectoryRetrieveResponseCellBody.ListLenSize
+        num_pairs = bytes(
+            data[DirectoryRetrieveResponseCellBody.ListLenBegin:DirectoryRetrieveResponseCellBody.ListLenEnd])
+        assert len(data) == DirectoryRetrieveResponseCellBody.ListLenSize + num_pairs * \
+            DirectoryRetrieveResponseCellBody.PairSize + \
+            DirectoryRetrieveResponseCellBody.SignatureSize
+        for i in range(num_pairs):
+            ip_begin = DirectoryRetrieveResponseCellBody.PairBegin + \
+                i * DirectoryRetrieveResponseCellBody.PairSize
+            ip_end = ip_begin + DirectoryRetrieveResponseCellBody.OrIpSize
+            pk_begin = ip_end
+            pk_end = pk_begin + DirectoryRetrieveResponseCellBody.OrPkSize
+            or_ips.append(bytes(data[ip_begin:ip_end]))
+            pks.append(bytes(data[pk_begin:pk_end]))
+        signature_begin = DirectoryRetrieveResponseCellBody.PairBegin + \
+            num_pairs * DirectoryRetrieveResponseCellBody.PairSize
+        signature_end = signature_begin + DirectoryRetrieveResponseCellBody.SignatureSize
+        signature = data[signature_begin:signature_end]
+        return DirectoryRetrieveResponseCellBody(or_ips, pks, signature)
