@@ -105,7 +105,7 @@ class DirectoryServer:
         cell_body = DirectoryRetrieveResponseCellBody(
             self.or_ips, self.pks, challenger_signature).serialize()
         cell_header = CellHeader(
-            THOR_VERSION, CellType.DirectoryRetrieveResponse, bytes(16), len(cell_body))
+            THOR_VERSION, CellType.DirectoryRetrieveResponse, bytes(16), len(cell_body)).serialize()
         send_all(client_sock, cell_header + cell_body)
 
 
