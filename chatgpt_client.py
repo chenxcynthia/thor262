@@ -49,12 +49,14 @@ def main(argv):
         for i in range(3):
             sk = client.create_onion_router(socket.inet_ntoa(ip_addrs[i]))
             client.receive_created(sk, pks[i])
+            print('')
         client.begin(hostname, port)
         if (client.receive_connected()):
             print("Successfullly connected to %s:%d" % (hostname, port))
         else:
             print("Connection to %s:%d failed" % (hostname, port))
             return 0
+        print('')
         client.send_data(request)
         response = client.recv_data()
         client.destroy()
