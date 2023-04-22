@@ -618,8 +618,8 @@ class DirectoryRetrieveResponseCellBody:
         or_ips: List[bytes] = []
         pks: List[bytes] = []
         assert len(data) >= DirectoryRetrieveResponseCellBody.ListLenSize
-        num_pairs = bytes(
-            data[DirectoryRetrieveResponseCellBody.ListLenBegin:DirectoryRetrieveResponseCellBody.ListLenEnd])
+        num_pairs = int.from_bytes(
+            data[DirectoryRetrieveResponseCellBody.ListLenBegin:DirectoryRetrieveResponseCellBody.ListLenEnd], byteorder='little')
         assert len(data) == DirectoryRetrieveResponseCellBody.ListLenSize + num_pairs * \
             DirectoryRetrieveResponseCellBody.PairSize + \
             DirectoryRetrieveResponseCellBody.SignatureSize

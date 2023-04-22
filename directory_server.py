@@ -107,6 +107,7 @@ class DirectoryServer:
         cell_header = CellHeader(
             THOR_VERSION, CellType.DirectoryRetrieveResponse, bytes(16), len(cell_body)).serialize()
         send_all(client_sock, cell_header + cell_body)
+        print("Sent a list of all ORs to %s" % socket.inet_ntoa(ip_addr))
 
 
 def main(argv):
