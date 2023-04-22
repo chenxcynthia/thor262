@@ -296,7 +296,7 @@ class OnionRouter:
             cell_body = RelayDataCellBody.deserialize(cell_body)
             send_all(circuit_state.destination_socket, cell_body.data)
             # Receive a response
-            response = recv_all(circuit_state.destination_socket, 1073741824)
+            response = recv_all(circuit_state.destination_socket, 1048576)
             # Send it upstream
             cell_body = RelayDataCellBody(response).serialize()
             cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
