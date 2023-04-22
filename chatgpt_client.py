@@ -23,7 +23,8 @@ def main(argv):
     hostname = "api.openai.com"
     port = 443
     if len(argv) != 2 and len(argv) != 5:
-        print("usage: python3 %s <API KEY> [<DS PUBLIC KEY> <DS IP ADDRESS> USETOR]" % argv[0])
+        print(
+            "usage: python3 %s <API KEY> [<DS PUBLIC KEY> <DS IP ADDRESS> USETOR]" % argv[0])
         return 1
     with open(argv[1], "r") as api_key_file:
         api_key = api_key_file.read().splitlines()[0]

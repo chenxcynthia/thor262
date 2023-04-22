@@ -26,13 +26,16 @@ class TorClient:
         nonce = random(32)
         # Request a list of onion routers
         cell_body = DirectoryRetrieveRequestCellBody(nonce).serialize()
-        cell_header = CellHeader(THOR_VERSION, CellType.DirectoryRetrieveRequest, bytes(16), len(cell_body))
+        cell_header = CellHeader(THOR_VERSION, CellType.DirectoryRetrieveRequest, bytes(
+            16), len(cell_body)).serialize()
         send_all(sock, cell_header + cell_body)
 
         # Receive the response
-        cell_header = CellHeader.deserialize(recv_all(sock, CellHeader.TotalSize))
+        cell_header = CellHeader.deserialize(
+            recv_all(sock, CellHeader.TotalSize))
         assert cell_header.type == CellType.DirectoryRetrieveResponse
-        cell_body = DirectoryRetrieveResponseCellBody.deserialize(recv_all(sock, cell_header.body_len))
+        cell_body = DirectoryRetrieveResponseCellBody.deserialize(
+            recv_all(sock, cell_header.body_len))
         or_ips = cell_body.or_ips
         or_pks = cell_body.pks
         print("Received OR addresses from DS")
