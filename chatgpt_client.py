@@ -47,7 +47,7 @@ def main(argv):
         ip_addrs, pks = zip(*sample(list(zip(all_ip_addrs, all_pks)), 3))
         print('')
         for i in range(3):
-            sk = client.create_onion_router(socket.inet_aton(ip_addrs[i]))
+            sk = client.create_onion_router(socket.inet_ntoa(ip_addrs[i]))
             client.receive_created(sk, pks[i])
         client.begin(hostname, port)
         if (client.receive_connected()):
