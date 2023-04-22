@@ -292,8 +292,8 @@ class OnionRouter:
             new_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             # Special-case for HTTPS
             if cell_body.port == 443:
-                context = ssl.SSLContext(ssl.PROTOCOL_TLSv1_2)
-                new_sock = context.wrap_socket(new_sock)
+                new_sock = ssl.create_default_context().wrap_socket(
+                    new_sock, server_hostname=cell_body.hostname)
             new_sock.settimeout(2)
             try:
                 new_sock.connect((cell_body.hostname, cell_body.port))

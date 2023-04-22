@@ -41,7 +41,10 @@ def recv_all(sock: socket.socket, length: int) -> bytes:
             if len(chunk) == 0:
                 break
         except socket.timeout:
-            break
+            if len(data) == 0:
+                continue
+            else:
+                break
         data += chunk
     return data
 

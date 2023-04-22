@@ -18,6 +18,8 @@ class TorClient:
         sk = PrivateKey.generate()
         pk = sk.public_key
 
+        print("Extending the circuit to OR %d at %s" % (self.stage + 1, ip))
+
         # making the first onion router
         if self.stage == 0:
             self.socket.connect((ip, 50051))
@@ -43,7 +45,6 @@ class TorClient:
     def receive_created(self, sk):
         cell_header = CellHeader.deserialize(
             recv_all(self.socket, CellHeader.TotalSize))
-        # assert cell_header.body_len == CreatedCellBody.TotalSize
 
         cell_body = recv_all(self.socket, cell_header.body_len)
         if self.stage == 0:
@@ -69,14 +70,14 @@ class TorClient:
         # update "stage" to next one
         self.stage += 1
 
-        print(f"OR {self.stage} public key:", b64encode(cell_body.pk))
-        print(f"OR {self.stage} hash of the session key:",
-              b64encode(cell_body.hash))
-        print(f"OR {self.stage} signature:", b64encode(cell_body.signature))
-        print(f"My hash of OR {self.stage} session key:",
-              b64encode(hash_shared_secret))
+        if hash_shared_secret == cell_body.hash:
+            print("Established a session key with OR %d" % self.stage)
+        else:
+            raise ValueError("Mismatch between client's and OR's session key")
 
     def begin(self, hostname, port):
+        print("Opening a TCP connection to %s:%d through the circuit" %
+              (hostname, port))
         body = RelayBeginCellBody(port, hostname).serialize()
         for j in reversed(range(3)):
             body = add_onion_layer(body, self.sess_keys[j])
@@ -95,6 +96,7 @@ class TorClient:
         return cell_body.status == 0
 
     def send_data(self, data: bytes):
+        print("Sending a request through the circuit")
         cell_body = RelayDataCellBody(data).serialize()
         for j in reversed(range(3)):
             cell_body = add_onion_layer(cell_body, self.sess_keys[j])
@@ -103,6 +105,7 @@ class TorClient:
         self.socket.send(cell_header + cell_body)
 
     def recv_data(self) -> bytes:
+        print("Receiving a request through the circuit")
         cell_header = CellHeader.deserialize(
             recv_all(self.socket, CellHeader.TotalSize))
         cell_body = recv_all(self.socket, cell_header.body_len)
@@ -113,6 +116,7 @@ class TorClient:
         return cell_body.data
 
     def destroy(self):
+        print("Destroying the circuit")
         body = DestroyCellBody().serialize()
         hdr = CellHeader(1, CellType.Destroy, self.circ_id,
                          len(body)).serialize()
@@ -120,32 +124,33 @@ class TorClient:
         self.socket.close()
 
 
-# TODO: use command line arguments for the 3 IP addresses
-ip_addr = ['127.0.0.1', '127.0.0.2', '127.0.0.3']
+if __name__ == "__main__":
+    # TODO: use command line arguments for the 3 IP addresses
+    ip_addr = ['127.0.0.1', '127.0.0.2', '127.0.0.3']
 
-# Destination website to connect to
-hostname = 'www.harvard.edu'
-port = 443
+    # Destination website to connect to
+    hostname = 'www.harvard.edu'
+    port = 443
 
-client = TorClient()
+    client = TorClient()
 
-# Create 3 onion routers
-for i in range(3):
-    sk = client.create_onion_router(ip_addr[i])
-    client.receive_created(sk)
+    # Create 3 onion routers
+    for i in range(3):
+        sk = client.create_onion_router(ip_addr[i])
+        client.receive_created(sk)
 
-# Send RelayBegin cell to start a TCP connection
-# Question: does port need to be passed in as a parameter?
-client.begin(hostname, port)
-if (client.receive_connected()):
-    print("Successfullly connected to %s:%d" % (hostname, port))
-else:
-    print("Connection to %s:%d failed" % (hostname, port))
+    # Send RelayBegin cell to start a TCP connection
+    # Question: does port need to be passed in as a parameter?
+    client.begin(hostname, port)
+    if (client.receive_connected()):
+        print("Successfullly connected to %s:%d" % (hostname, port))
+    else:
+        print("Connection to %s:%d failed" % (hostname, port))
 
-print("Sending a GET request")
-client.send_data(b"GET / HTTP/1.1\r\nHost:www.harvard.edu\r\n\r\n")
-data = client.recv_data()
-print("First 100 characters of response:", data[:100])
+    print("Sending a GET request")
+    client.send_data(b"GET / HTTP/1.1\r\nHost:www.harvard.edu\r\n\r\n")
+    data = client.recv_data()
+    print("First 100 characters of response:", data[:100])
 
-# Now tear down the circuit
-client.destroy()
+    # Now tear down the circuit
+    client.destroy()
