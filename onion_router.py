@@ -47,7 +47,7 @@ class OnionRouter:
 
     def serve(self):
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-        self.sock.bind((self.ip, self.port))
+        self.sock.bind(('0.0.0.0', THOR_PORT))
         self.sock.listen(32)
         while True:
             client_sock, addr = self.sock.accept()
@@ -472,7 +472,7 @@ def main(argv):
         print("Failed to verify the DS's signature")
     elif status == 1:
         print("DS refused the join")
-    # orouter.serve()
+    orouter.serve()
 
 
 if __name__ == "__main__":

@@ -1,6 +1,7 @@
 import socket
 from base64 import b64encode
 from nacl.public import PrivateKey, PublicKey, Box
+from nacl.signing import VerifyKey
 from nacl.encoding import RawEncoder
 from nacl.hash import blake2b
 from nacl.utils import random
@@ -8,11 +9,42 @@ from tor_protocol import *
 
 
 class TorClient:
-    def __init__(self):
+    def __init__(self, ds_ip: str, ds_key: VerifyKey):
+        self.ds_ip = ds_ip
+        self.ds_key = ds_key
         self.circ_id = random(16)
         self.sess_keys = [None, None, None]
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.stage = 0  # which onion router in the circuit the client is making
+
+    def retrieve_onion_routers(self):
+        print("Connecting to DS at %s" % self.ds_ip)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect((self.ds_ip, THOR_PORT))
+
+        # Generate nonce for request
+        nonce = random(32)
+        # Request a list of onion routers
+        cell_body = DirectoryRetrieveRequestCellBody(nonce).serialize()
+        cell_header = CellHeader(THOR_VERSION, CellType.DirectoryRetrieveRequest, bytes(16), len(cell_body))
+        send_all(sock, cell_header + cell_body)
+
+        # Receive the response
+        cell_header = CellHeader.deserialize(recv_all(sock, CellHeader.TotalSize))
+        assert cell_header.type == CellType.DirectoryRetrieveResponse
+        cell_body = DirectoryRetrieveResponseCellBody.deserialize(recv_all(sock, cell_header.body_len))
+        or_ips = cell_body.or_ips
+        or_pks = cell_body.pks
+        print("Received OR addresses from DS")
+        # Verify the DS's signature
+        signature_payload = nonce
+        assert len(or_ips) == len(or_pks)
+        for i in range(len(or_ips)):
+            signature_payload += or_ips[i]
+            signature_payload += or_pks[i]
+        self.ds_key.verify(signature_payload, cell_body.signature)
+        print("DS signature verified")
+        return or_ips, or_pks
 
     def create_onion_router(self, ip):
         sk = PrivateKey.generate()
@@ -42,7 +74,7 @@ class TorClient:
 
         return sk
 
-    def receive_created(self, sk):
+    def receive_created(self, sk, pk):
         cell_header = CellHeader.deserialize(
             recv_all(self.socket, CellHeader.TotalSize))
 
@@ -66,6 +98,9 @@ class TorClient:
         self.sess_keys[self.stage] = session_key
         hash_shared_secret = blake2b(
             session_key, digest_size=32, person=b"THOR", encoder=RawEncoder)
+        signature_payload = cell_body.pk + cell_body.hash
+        VerifyKey(pk).verify(signature_payload, cell_body.signature)
+        print("OR signature verified")
 
         # update "stage" to next one
         self.stage += 1
@@ -122,35 +157,3 @@ class TorClient:
                          len(body)).serialize()
         self.socket.send(hdr + body)
         self.socket.close()
-
-
-if __name__ == "__main__":
-    # TODO: use command line arguments for the 3 IP addresses
-    ip_addr = ['127.0.0.1', '127.0.0.2', '127.0.0.3']
-
-    # Destination website to connect to
-    hostname = 'www.harvard.edu'
-    port = 443
-
-    client = TorClient()
-
-    # Create 3 onion routers
-    for i in range(3):
-        sk = client.create_onion_router(ip_addr[i])
-        client.receive_created(sk)
-
-    # Send RelayBegin cell to start a TCP connection
-    # Question: does port need to be passed in as a parameter?
-    client.begin(hostname, port)
-    if (client.receive_connected()):
-        print("Successfullly connected to %s:%d" % (hostname, port))
-    else:
-        print("Connection to %s:%d failed" % (hostname, port))
-
-    print("Sending a GET request")
-    client.send_data(b"GET / HTTP/1.1\r\nHost:www.harvard.edu\r\n\r\n")
-    data = client.recv_data()
-    print("First 100 characters of response:", data[:100])
-
-    # Now tear down the circuit
-    client.destroy()
