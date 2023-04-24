@@ -4,9 +4,9 @@ Distributed system implementation of Tor
 Contributors: @[darkwood101](https://github.com/darkwood101/), @[cynthia9chen](https://github.com/cynthia9chen)
 
 - [1. Background and System Design](#1-background-and-system-design)
-- [2. Running Tor262](#2-build)
+- [2. Running Tor262](#2-Running-Tor262)
 - [3. Implementation](#3-implementation)
-- [4. Real-World Application](#3-application)
+- [4. Real-World Application](#4-Real-World-Application)
 
 ## 1. Background and System Design
 
