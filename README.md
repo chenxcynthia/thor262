@@ -1,10 +1,19 @@
 # Tor262
 Distributed system implementation of Tor
 
-Authors: @darkwood101, @cynthia9chen
+Contributors: @[darkwood101](https://github.com/darkwood101/), @[cynthia9chen](https://github.com/cynthia9chen)
 
-## Quick test
+- [1. Background and System Design](#1-background)
+- [2. Running Tor262](#2-build)
+- [3. Implementation](#3-implementation)
+- [4. Real-World Application](#3-application)
 
+## 1. Background and System Design
+
+Tor262 is a distributed systems implementation of The Onion Router, widely known as Tor. We develop a peer-to-peer distributed system to enable encrypted communication between the client and respective onion routers. Our system relies on three onion routers, selected using a directory server, and the client maintains encrypted connection with these onion routers which eventually relay a connection request to a website in an anonymous manner. Finally, we deploy our system for a real-word application: connecting to ChatGPT in Italy, where it is currently banned, by relaying data through a series of onion routers hosted on international AWS instances.  
+
+
+## 2. Running Tor262 locally
 Generate key file:
 ```console
 $ python3 generate_signing_key.py test.key
@@ -39,3 +48,9 @@ My hash of OR 3 session key: b'Ce7kp0Q1t+xib2SI6932XKwJHMBLDYVt08b2eEt1jM4='
 ```
 
 "OR 1 hash of the session key" must match "My hash of OR 1 session key". Same for OR 2 and OR 3.
+
+## 3. Implementation
+
+## 4. Real-World Application
+
+
