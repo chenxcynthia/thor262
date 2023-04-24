@@ -38,7 +38,7 @@ class TorClient:
             recv_all(sock, cell_header.body_len))
         or_ips = cell_body.or_ips
         or_pks = cell_body.pks
-        print("Received OR addresses from DS")
+        print("Received %d OR addresses from DS" % len(or_ips))
         # Verify the DS's signature
         signature_payload = nonce
         assert len(or_ips) == len(or_pks)
