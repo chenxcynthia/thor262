@@ -26,16 +26,16 @@ class DirectoryServer:
     def handle_client(self, client_sock: socket.socket, addr: Tuple[str, int]):
         print("Accepted connection from %s:%d" % (addr[0], addr[1]))
         ip_addr = socket.inet_aton(addr[0])
-        while True:
-            cell_header = recv_all(client_sock, CellHeader.TotalSize)
-            if len(cell_header) == 0:
-                break
-            cell_header = CellHeader.deserialize(cell_header)
-            if cell_header.type == CellType.DirectoryChallengeInit:
-                self.handle_challenge(ip_addr, client_sock, cell_header)
-            elif cell_header.type == CellType.DirectoryRetrieveRequest:
-                self.handle_retrieve(ip_addr, client_sock, cell_header)
-                client_sock.close()
+        cell_header = recv_all(client_sock, CellHeader.TotalSize)
+        if len(cell_header) == 0:
+            client_sock.close()
+            return
+        cell_header = CellHeader.deserialize(cell_header)
+        if cell_header.type == CellType.DirectoryChallengeInit:
+            self.handle_challenge(ip_addr, client_sock, cell_header)
+        elif cell_header.type == CellType.DirectoryRetrieveRequest:
+            self.handle_retrieve(ip_addr, client_sock, cell_header)
+            client_sock.close()
 
     def handle_challenge(self, ip_addr: bytes, client_sock: socket.socket, cell_header: CellHeader):
         # Receive INIT
@@ -124,6 +124,7 @@ class DirectoryServer:
             print("OR at {} didn't send a heartbeat, ".format(
                 socket.inet_ntoa(ip_addr)), end='')
         print("removing from the list")
+        sock.close()
         index = self.or_ips.index(ip_addr)
         self.or_ips.pop(index)
         self.pks.pop(index)
