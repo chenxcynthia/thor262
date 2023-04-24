@@ -462,8 +462,8 @@ class OnionRouter:
 
     def heartbeat(self, sock: socket.socket):
         cell_body = DirectoryHeartbeatCellBody().serialize()
-        cell_header = CellHeader(
-            THOR_VERSION, CellType.DirectoryHeartbeat, bytes(16), len(cell_body))
+        cell_header = CellHeader(THOR_VERSION, CellType.DirectoryHeartbeat, bytes(
+            16), len(cell_body)).serialize()
         msg = cell_header + cell_body
         while True:
             sock.send(msg)
