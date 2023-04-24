@@ -33,6 +33,8 @@ class DirectoryServer:
             cell_header = CellHeader.deserialize(cell_header)
             if cell_header.type == CellType.DirectoryChallengeInit:
                 self.handle_challenge(ip_addr, client_sock, cell_header)
+                threading.Thread(target=self.keepalive, args=(
+                    ip_addr, client_sock)).start()
             elif cell_header.type == CellType.DirectoryRetrieveRequest:
                 self.handle_retrieve(ip_addr, client_sock, cell_header)
         client_sock.close()
@@ -108,6 +110,23 @@ class DirectoryServer:
             THOR_VERSION, CellType.DirectoryRetrieveResponse, bytes(16), len(cell_body)).serialize()
         send_all(client_sock, cell_header + cell_body)
         print("Sent a list of all ORs to %s" % socket.inet_ntoa(ip_addr))
+
+    def keepalive(self, ip_addr: bytes, sock: socket.socket):
+        sock.settimeout(5)
+        try:
+            while True:
+                cell_header = sock.recv(CellHeader.TotalSize)
+                if len(cell_header) == 0:
+                    print("OR at {} closed the connection, ".format(
+                        socket.inet_ntoa(ip_addr)), end='')
+                    break
+        except socket.timeout:
+            print("OR at {} didn't send a heartbeat, ".format(
+                socket.inet_ntoa(ip_addr)), end='')
+        print("removing from the list")
+        index = self.or_ips.index(ip_addr)
+        self.or_ips.pop(index)
+        self.pks.pop(index)
 
 
 def main(argv):

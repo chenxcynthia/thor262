@@ -68,7 +68,8 @@ class CellType(IntEnum):
     DirectoryChallengeAck = 13,
     DirectoryRetrieveRequest = 14,
     DirectoryRetrieveResponse = 15,
-    EndCellType = 16
+    DirectoryKeepAlive = 16,
+    EndCellType = 17
 
 
 class CellHeader:
@@ -636,3 +637,16 @@ class DirectoryRetrieveResponseCellBody:
         signature_end = signature_begin + DirectoryRetrieveResponseCellBody.SignatureSize
         signature = data[signature_begin:signature_end]
         return DirectoryRetrieveResponseCellBody(or_ips, pks, signature)
+
+
+class DirectoryKeepAliveCellBody:
+    def __init__(self):
+        pass
+
+    def serialize(self) -> bytearray:
+        return bytearray(0)
+
+    @staticmethod
+    def deserialize(data: bytearray) -> "DirectoryKeepAliveCellBody":
+        assert len(data) == 0
+        return DirectoryKeepAliveCellBody()
