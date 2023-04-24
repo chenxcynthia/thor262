@@ -102,7 +102,7 @@ class OnionRouter:
 
         # Start a thread to maintain a heartbeat
         if cell_body.status == 0:
-            threading.Thread(target=self.hearbeat, args=(sock)).start()
+            threading.Thread(target=self.heartbeat, args=(sock)).start()
 
         return cell_body.status
 
