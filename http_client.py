@@ -43,7 +43,7 @@ def main(argv):
             print('')
         client.begin(hostname, port)
         if (client.receive_connected()):
-            print("Successfullly connected to %s:%d" % (hostname, port))
+            print("Successfully connected to %s:%d" % (hostname, port))
         else:
             print("Connection to %s:%d failed" % (hostname, port))
             return 0

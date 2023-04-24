@@ -134,7 +134,7 @@ class TorClient:
         return cell_body.status == 0
 
     def send_data(self, data: bytes):
-        print("Sending a request through the circuit")
+        print("Sending a message through the circuit")
         cell_body = RelayDataCellBody(data).serialize()
         for j in reversed(range(3)):
             cell_body = add_onion_layer(cell_body, self.sess_keys[j])
@@ -143,7 +143,7 @@ class TorClient:
         self.socket.send(cell_header + cell_body)
 
     def recv_data(self) -> bytes:
-        print("Receiving a request through the circuit")
+        print("Receiving a message through the circuit")
         cell_header = CellHeader.deserialize(
             recv_all(self.socket, CellHeader.TotalSize))
         cell_body = recv_all(self.socket, cell_header.body_len)
