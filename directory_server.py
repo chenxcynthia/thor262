@@ -37,7 +37,7 @@ class DirectoryServer:
                     ip_addr, client_sock)).start()
             elif cell_header.type == CellType.DirectoryRetrieveRequest:
                 self.handle_retrieve(ip_addr, client_sock, cell_header)
-        client_sock.close()
+                client_sock.close()
 
     def handle_challenge(self, ip_addr: bytes, client_sock: socket.socket, cell_header: CellHeader):
         # Receive INIT
