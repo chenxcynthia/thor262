@@ -33,8 +33,6 @@ class DirectoryServer:
             cell_header = CellHeader.deserialize(cell_header)
             if cell_header.type == CellType.DirectoryChallengeInit:
                 self.handle_challenge(ip_addr, client_sock, cell_header)
-                threading.Thread(target=self.keepalive, args=(
-                    ip_addr, client_sock)).start()
             elif cell_header.type == CellType.DirectoryRetrieveRequest:
                 self.handle_retrieve(ip_addr, client_sock, cell_header)
                 client_sock.close()
@@ -79,11 +77,13 @@ class DirectoryServer:
             THOR_VERSION, CellType.DirectoryChallengeAck, bytes(16), len(cell_body)).serialize()
         send_all(client_sock, cell_header + cell_body)
 
-        # If challenge successful, add to list
+        # If challenge successful, add to list and start a heartbeat thread
         if status == 0:
             self.or_ips.append(ip_addr)
             self.pks.append(init_pk)
             print("Approved join from OR at %s" % socket.inet_ntoa(ip_addr))
+            threading.Thread(target=self.heartbeat, args=(
+                ip_addr, client_sock)).start()
         else:
             print("Refused join from OR at %s" % socket.inet_ntoa(ip_addr))
 
@@ -111,7 +111,7 @@ class DirectoryServer:
         send_all(client_sock, cell_header + cell_body)
         print("Sent a list of all ORs to %s" % socket.inet_ntoa(ip_addr))
 
-    def keepalive(self, ip_addr: bytes, sock: socket.socket):
+    def heartbeat(self, ip_addr: bytes, sock: socket.socket):
         sock.settimeout(5)
         try:
             while True:

@@ -9,6 +9,7 @@ from nacl.encoding import RawEncoder
 from nacl.utils import random
 from typing import Tuple, Dict, List
 from tor_protocol import *
+from time import sleep
 
 
 class CircuitState:
@@ -98,6 +99,11 @@ class OnionRouter:
         assert cell_header.type == CellType.DirectoryChallengeAck
         cell_body = DirectoryChallengeAckCellBody.deserialize(
             recv_all(sock, cell_header.body_len))
+
+        # Start a thread to maintain a heartbeat
+        if cell_body.status == 0:
+            threading.Thread(target=self.hearbeat, args=(sock)).start()
+
         return cell_body.status
 
     def handle_client(self, client_sock: socket.socket, addr: Tuple[str, int]):
@@ -453,6 +459,15 @@ class OnionRouter:
         msg = hdr + cell_body
         sock = self.or_sockets[circuit_state.ip_addresses[0]]
         send_all(sock, msg)
+
+    def heartbeat(self, sock: socket.socket):
+        cell_body = DirectoryHeartbeatCellBody().serialize()
+        cell_header = CellHeader(
+            THOR_VERSION, CellType.DirectoryHeartbeat, bytes(16), len(cell_body))
+        msg = cell_header + cell_body
+        while True:
+            sock.send(msg)
+            sleep(2)
 
 
 def main(argv):

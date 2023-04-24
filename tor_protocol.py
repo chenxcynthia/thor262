@@ -68,7 +68,7 @@ class CellType(IntEnum):
     DirectoryChallengeAck = 13,
     DirectoryRetrieveRequest = 14,
     DirectoryRetrieveResponse = 15,
-    DirectoryKeepAlive = 16,
+    DirectoryHeartbeat = 16,
     EndCellType = 17
 
 
@@ -639,7 +639,7 @@ class DirectoryRetrieveResponseCellBody:
         return DirectoryRetrieveResponseCellBody(or_ips, pks, signature)
 
 
-class DirectoryKeepAliveCellBody:
+class DirectoryHeartbeatCellBody:
     def __init__(self):
         pass
 
@@ -647,6 +647,6 @@ class DirectoryKeepAliveCellBody:
         return bytearray(0)
 
     @staticmethod
-    def deserialize(data: bytearray) -> "DirectoryKeepAliveCellBody":
+    def deserialize(data: bytearray) -> "DirectoryHeartbeatCellBody":
         assert len(data) == 0
-        return DirectoryKeepAliveCellBody()
+        return DirectoryHeartbeatCellBody()
