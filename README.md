@@ -1,5 +1,7 @@
-# tor-262
+# Tor262
 Distributed system implementation of Tor
+
+Authors: @darkwood101, @cynthia9chen
 
 ## Quick test
 
