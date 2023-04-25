@@ -118,17 +118,17 @@ class DirectoryServer:
             try:
                 cell_header = sock.recv(CellHeader.TotalSize)
             except:
-                print("Failed to receive heartbeat from OR at {},".format(
+                print("Failed to receive heartbeat from OR at {}, ".format(
                     socket.inet_ntoa(ip_addr)), end='')
                 break
             if len(cell_header) == 0:
-                print("Failed to receive heartbeat from OR at {},".format(
+                print("Failed to receive heartbeat from OR at {}, ".format(
                     socket.inet_ntoa(ip_addr)), end='')
                 break
             try:
                 sock.send(cell_header)
             except:
-                print("Failed to send heartbeat to OR at {},".format(
+                print("Failed to send heartbeat to OR at {}, ".format(
                     socket.inet_ntoa(ip_addr)), end='')
                 break
         print("removing from the list")
