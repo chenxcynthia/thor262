@@ -112,6 +112,7 @@ class OnionRouter:
         assert ip_addr not in self.or_sockets
         self.or_sockets[ip_addr] = client_sock
         while True:
+            print('')
             data = recv_all(client_sock, CellHeader.TotalSize)
             print("Received a request from {} [{}]: ".format(
                 addr[0], get_country(addr[0])), end='')
