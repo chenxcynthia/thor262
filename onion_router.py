@@ -125,6 +125,7 @@ class OnionRouter:
                 print("Relay")
                 self.handle_relay_extend(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.Created:
+                print("Created")
                 self.handle_created(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.RelayExtended:
                 print("Relay")
