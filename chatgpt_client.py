@@ -32,6 +32,7 @@ def main(argv):
         with open(argv[3], "rb") as ds_keyfile:
             ds_publickey = ds_keyfile.read(32)
     gpt_question = input("Enter a question for ChatGPT: ")
+    print('')
     request = get_request(api_key, gpt_question)
     if len(argv) == 2:
         new_sock = ssl.create_default_context().wrap_socket(socket.socket(
