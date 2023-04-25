@@ -238,7 +238,7 @@ class OnionRouter:
             msg = hdr + body
             sock = self.or_sockets[circuit_state.ip_addresses[1]]
             print("Destroyed the circuit, forwarding Destroy to {} [{}]".format(
-                socket.inet_ntoa(circuit_state.ip_addresses[1]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[1]))))
+                socket.inet_ntoa(circuit_state.ip_addresses[1]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[1]))))
             send_all(sock, msg)
 
         # Close any possible destination connection
@@ -290,7 +290,7 @@ class OnionRouter:
                              circuit_state.circuit_ids[0], len(cell_body)).serialize()
 
             print("Added an onion layer, forwarding Relay to {} [{}]".format(
-                socket.inet_ntoa(circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
+                socket.inet_ntoa(circuit_state.ip_addresses[0]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[0]))))
 
             # Send the message
             msg = hdr + cell_body
@@ -307,7 +307,7 @@ class OnionRouter:
             assert circuit_state.circuit_ids[1] is not None
 
             print("Removed an onion layer, forwarding Relay to {} [{}]".format(
-                socket.inet_ntoa(circuit_state.ip_addresses[1]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[1]))))
+                socket.inet_ntoa(circuit_state.ip_addresses[1]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[1]))))
 
             # Create the header
             hdr = CellHeader(THOR_VERSION, CellType.RelayData,
@@ -332,7 +332,7 @@ class OnionRouter:
             cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
 
             print("Received a response from {}, added an onion layer, sending Relay to {} [{}]".format(circuit_state.destination_hostname, socket.inet_ntoa(
-                circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
+                circuit_state.ip_addresses[0]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[0]))))
 
             hdr = CellHeader(THOR_VERSION, CellType.RelayData,
                              circuit_state.circuit_ids[0], len(cell_body)).serialize()
@@ -357,7 +357,7 @@ class OnionRouter:
             assert circuit_state.circuit_ids[1] is not None
 
             print("Removed an onion layer, forwarding Relay to {} [{}]".format(
-                socket.inet_ntoa(circuit_state.ip_addresses[1]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[1]))))
+                socket.inet_ntoa(circuit_state.ip_addresses[1]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[1]))))
 
             # Create the header
             hdr = CellHeader(THOR_VERSION, CellType.RelayBegin,
@@ -394,7 +394,7 @@ class OnionRouter:
             cell_body = RelayConnectedCellBody(status).serialize()
             cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
             print("Added an onion layer, sending Relay to {} [{}]".format(
-                socket.inet_ntoa(circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
+                socket.inet_ntoa(circuit_state.ip_addresses[0]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[0]))))
             hdr = CellHeader(THOR_VERSION, CellType.RelayConnected,
                              circuit_state.circuit_ids[0], len(cell_body)).serialize()
             msg = hdr + cell_body
@@ -414,7 +414,7 @@ class OnionRouter:
         cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
 
         print("Added an onion layer, forwarding Relay to {} [{}]".format(
-            socket.inet_ntoa(circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
+            socket.inet_ntoa(circuit_state.ip_addresses[0]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[0]))))
 
         # Create header
         hdr = CellHeader(THOR_VERSION, CellType.RelayConnected,
@@ -442,7 +442,7 @@ class OnionRouter:
             assert circuit_state.circuit_ids[1] is not None
 
             print("Removed an onion layer, forwarding Relay to {} [{}]".format(
-                socket.inet_ntoa(circuit_state.ip_addresses[1]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[1]))))
+                socket.inet_ntoa(circuit_state.ip_addresses[1]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[1]))))
 
             # Create the header
             hdr = CellHeader(THOR_VERSION, CellType.RelayExtend,
