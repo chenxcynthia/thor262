@@ -107,7 +107,6 @@ class OnionRouter:
         return cell_body.status
 
     def handle_client(self, client_sock: socket.socket, addr: Tuple[str, int]):
-        print("Accepted connection from %s:%d" % (addr[0], addr[1]))
         ip_addr = socket.inet_aton(addr[0])
         # This connection wasn't already open
         assert ip_addr not in self.or_sockets
@@ -467,13 +466,14 @@ class OnionRouter:
         msg = cell_header + cell_body
         while True:
             sock.send(msg)
+            sock.recv(CellHeader.TotalSize)
             sleep(2)
 
 
 def main(argv):
     if len(argv) != 4:
         print(
-            "usage: %s <DIRECTORY SERVER IP ADDRESS> <DIRECTORY SERVER PUBLIC KEY> <PRIVATE KEY FILE>" % argv[0])
+            "usage: %s <DS IP ADDRESS> <DS PUBLIC KEY> <PRIVATE KEY FILE>" % argv[0])
         return 1
     with open(argv[2], "rb") as keyfile:
         ds_publickey = keyfile.read(32)

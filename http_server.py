@@ -42,10 +42,10 @@ class Server(BaseHTTPRequestHandler):
         country = get_country(self.client_address[0])
         if country in ["US", None]:
             response = response_denied(country)
-            print("Reqeust received from {} -- denied".format(country))
+            print("Request received from {} -- denied".format(country))
         else:
             response = response_accepted(country)
-            print("Reqeust received from {} -- accepted".format(country))
+            print("Request received from {} -- accepted".format(country))
         self.wfile.write(response)
 
 

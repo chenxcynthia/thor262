@@ -29,7 +29,7 @@ def main(argv):
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(4)
         sock.connect((hostname, port))
-        print("Successfullly connected to %s:%d" % (hostname, port))
+        print("Successfully connected to %s:%d" % (hostname, port))
         send_all(sock, request)
         response = recv_all(sock, 4096)
     else:

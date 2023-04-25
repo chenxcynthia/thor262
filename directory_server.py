@@ -18,6 +18,7 @@ class DirectoryServer:
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind(('0.0.0.0', THOR_PORT))
         self.sock.listen(32)
+        print("DS started")
         while True:
             client_sock, addr = self.sock.accept()
             threading.Thread(target=self.handle_client,
@@ -113,16 +114,23 @@ class DirectoryServer:
 
     def heartbeat(self, ip_addr: bytes, sock: socket.socket):
         sock.settimeout(5)
-        try:
-            while True:
+        while True:
+            try:
                 cell_header = sock.recv(CellHeader.TotalSize)
-                if len(cell_header) == 0:
-                    print("OR at {} closed the connection, ".format(
-                        socket.inet_ntoa(ip_addr)), end='')
-                    break
-        except socket.timeout:
-            print("OR at {} didn't send a heartbeat, ".format(
-                socket.inet_ntoa(ip_addr)), end='')
+            except:
+                print("Failed to receive heartbeat from OR at {},".format(
+                    socket.inet_ntoa(ip_addr)), end='')
+                break
+            if len(cell_header) == 0:
+                print("Failed to receive heartbeat from OR at {},".format(
+                    socket.inet_ntoa(ip_addr)), end='')
+                break
+            try:
+                sock.send(cell_header)
+            except:
+                print("Failed to send heartbeat to OR at {},".format(
+                    socket.inet_ntoa(ip_addr)), end='')
+                break
         print("removing from the list")
         sock.close()
         index = self.or_ips.index(ip_addr)
