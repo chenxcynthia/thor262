@@ -4,7 +4,7 @@ from nacl.hash import blake2b
 from nacl.encoding import RawEncoder
 from nacl.utils import random
 import socket
-from typing import List
+from typing import List, Dict
 import requests  # For geolocating
 
 THOR_VERSION = 1
@@ -51,12 +51,17 @@ def recv_all(sock: socket.socket, length: int) -> bytes:
         data += chunk
     return data
 
+g_countries: Dict[str, str] = {None: None}
 
 def get_country(ip: str) -> str:
+    global g_countries
+    if ip in g_countries:
+        return g_countries[ip]
     data = requests.get("https://ipinfo.io/{}/json".format(ip)).json()
     if "country" not in data:
         return None
     else:
+        g_countries[ip] = data["country"]
         return data["country"]
 
 
