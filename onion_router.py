@@ -495,7 +495,7 @@ class OnionRouter:
         cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
 
         print("Added an onion layer, forwarding Relay to {} [{}]".format(
-            socket.inet_ntoa(circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
+            socket.inet_ntoa(circuit_state.ip_addresses[0]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[0]))))
 
         # Create header
         hdr = CellHeader(THOR_VERSION, CellType.RelayExtended,
