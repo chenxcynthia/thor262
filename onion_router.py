@@ -113,29 +113,35 @@ class OnionRouter:
         self.or_sockets[ip_addr] = client_sock
         while True:
             data = recv_all(client_sock, CellHeader.TotalSize)
-            print(threading.get_ident())
-            print(len(data))
-            print(data)
+            print("Received a request from {} [{}]: ".format(
+                addr[0], get_country(addr[0])), end='')
             if len(data) == 0:
                 break
             cell_header = CellHeader.deserialize(data)
             if cell_header.type == CellType.Create:
+                print("Create")
                 self.handle_create(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.RelayExtend:
+                print("Relay")
                 self.handle_relay_extend(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.Created:
                 self.handle_created(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.RelayExtended:
+                print("Relay")
                 self.handle_relay_extended(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.Destroy:
+                print("Destroy")
                 self.handle_destroy(ip_addr, client_sock, cell_header)
                 if ip_addr not in self.or_sockets:
                     break
             elif cell_header.type == CellType.RelayBegin:
+                print("Relay")
                 self.handle_relay_begin(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.RelayConnected:
+                print("Relay")
                 self.handle_relay_connected(ip_addr, client_sock, cell_header)
             elif cell_header.type == CellType.RelayData:
+                print("Relay")
                 self.handle_relay_data(ip_addr, client_sock, cell_header)
 
     def handle_create(self, ip_addr: bytes,
@@ -172,6 +178,9 @@ class OnionRouter:
             circuit_state.privkey.public_key.encode() +
             sesskey_hash).signature
 
+        print("Established a session key, sending Created to {} [{}]".format(
+            socket.inet_ntoa(ip_addr), get_country(socket.inet_ntoa(ip_addr))))
+
         # Send response
         response_cell = CreatedCellBody(
             circuit_state.privkey.public_key.encode(),
@@ -202,6 +211,9 @@ class OnionRouter:
         hdr = CellHeader(THOR_VERSION, CellType.RelayExtended,
                          circuit_state.circuit_ids[0], len(body)).serialize()
 
+        print("Added an onion layer, sending Relay to {} [{}]".format(
+            socket.inet_ntoa(circuit_state.ip_addresses[0]), get_country(socket.inet_ntoa(circuit_state.ip_addresses[0]))))
+
         # Send the message
         msg = hdr + body
         sock = self.or_sockets[circuit_state.ip_addresses[0]]
@@ -225,6 +237,8 @@ class OnionRouter:
                              circuit_state.circuit_ids[1], len(body)).serialize()
             msg = hdr + body
             sock = self.or_sockets[circuit_state.ip_addresses[1]]
+            print("Destroyed the circuit, forwarding Destroy to {} [{}]".format(
+                socket.inet_ntoa(circuit_state.ip_addresses[1]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[1]))))
             send_all(sock, msg)
 
         # Close any possible destination connection
@@ -275,6 +289,9 @@ class OnionRouter:
             hdr = CellHeader(THOR_VERSION, CellType.RelayData,
                              circuit_state.circuit_ids[0], len(cell_body)).serialize()
 
+            print("Added an onion layer, forwarding Relay to {} [{}]".format(
+                socket.inet_ntoa(circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
+
             # Send the message
             msg = hdr + cell_body
             sock = self.or_sockets[circuit_state.ip_addresses[0]]
@@ -288,6 +305,10 @@ class OnionRouter:
         if not verify_digest(bytes(cell_body)):
             # The other circuit ID must exist
             assert circuit_state.circuit_ids[1] is not None
+
+            print("Removed an onion layer, forwarding Relay to {} [{}]".format(
+                socket.inet_ntoa(circuit_state.ip_addresses[1]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[1]))))
+
             # Create the header
             hdr = CellHeader(THOR_VERSION, CellType.RelayData,
                              circuit_state.circuit_ids[1], len(cell_body)).serialize()
@@ -299,12 +320,20 @@ class OnionRouter:
             assert circuit_state.destination_socket is not None
             # Send the data to the destination
             cell_body = RelayDataCellBody.deserialize(cell_body)
+
+            print("Removed an onion layer, sending data to {}".format(
+                circuit_state.destination_hostname))
+
             send_all(circuit_state.destination_socket, cell_body.data)
             # Receive a response
             response = recv_all(circuit_state.destination_socket, 1048576)
             # Send it upstream
             cell_body = RelayDataCellBody(response).serialize()
             cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
+
+            print("Received a response from {}, added an onion layer, sending Relay to {} [{}]".format(circuit_state.destination_hostname, socket.inet_ntoa(
+                circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
+
             hdr = CellHeader(THOR_VERSION, CellType.RelayData,
                              circuit_state.circuit_ids[0], len(cell_body)).serialize()
             msg = hdr + cell_body
@@ -326,6 +355,10 @@ class OnionRouter:
         if not verify_digest(bytes(cell_body)):
             # The other circuit ID must exist
             assert circuit_state.circuit_ids[1] is not None
+
+            print("Removed an onion layer, forwarding Relay to {} [{}]".format(
+                socket.inet_ntoa(circuit_state.ip_addresses[1]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[1]))))
+
             # Create the header
             hdr = CellHeader(THOR_VERSION, CellType.RelayBegin,
                              circuit_state.circuit_ids[1], len(cell_body)).serialize()
@@ -337,6 +370,10 @@ class OnionRouter:
             assert circuit_state.destination_socket is None
             cell_body = RelayBeginCellBody.deserialize(cell_body)
             new_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+
+            print("Removed an onion layer, connecting to {}".format(
+                cell_body.hostname))
+
             # Special-case for HTTPS
             if cell_body.port == 443:
                 new_sock = ssl.create_default_context().wrap_socket(
@@ -347,15 +384,17 @@ class OnionRouter:
                 circuit_state.destination_socket = new_sock
                 circuit_state.destination_hostname = cell_body.hostname
                 circuit_state.destination_port = cell_body.port
-                print("Connecting to %s:%d successful" %
-                      (cell_body.hostname, cell_body.port))
+                print("Connecting to {} successful, ".format(
+                    cell_body.hostname), end='')
                 status = 0
             except:
-                print("Connecting to %s:%d failed" %
-                      (cell_body.hostname, cell_body.port))
+                print("Connecting to {} failed, ".format(
+                    cell_body.hostname), end='')
                 status = 1
             cell_body = RelayConnectedCellBody(status).serialize()
             cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
+            print("Added an onion layer, sending Relay to {} [{}]".format(
+                socket.inet_ntoa(circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
             hdr = CellHeader(THOR_VERSION, CellType.RelayConnected,
                              circuit_state.circuit_ids[0], len(cell_body)).serialize()
             msg = hdr + cell_body
@@ -373,6 +412,9 @@ class OnionRouter:
         # Add onion layer
         circuit_state = self.circuits[circ_id]
         cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
+
+        print("Added an onion layer, forwarding Relay to {} [{}]".format(
+            socket.inet_ntoa(circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
 
         # Create header
         hdr = CellHeader(THOR_VERSION, CellType.RelayConnected,
@@ -398,6 +440,10 @@ class OnionRouter:
         if not verify_digest(bytes(cell_body)):
             # The other circuit ID must exist
             assert circuit_state.circuit_ids[1] is not None
+
+            print("Removed an onion layer, forwarding Relay to {} [{}]".format(
+                socket.inet_ntoa(circuit_state.ip_addresses[1]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[1]))))
+
             # Create the header
             hdr = CellHeader(THOR_VERSION, CellType.RelayExtend,
                              circuit_state.circuit_ids[1], len(cell_body)).serialize()
@@ -410,10 +456,8 @@ class OnionRouter:
             # Connect to the next OR if not already connected
             # TODO: synchronize
             cell_body = RelayExtendCellBody.deserialize(cell_body)
-            print(
-                "Address of the next OR:",
-                socket.inet_ntoa(
-                    cell_body.next_or_ip))
+            print("Removed an onion layer, connecting to next OR at {} [{}]".format(socket.inet_ntoa(
+                cell_body.next_or_ip), get_country(socket.inet_ntoa(cell_body.next_or_ip))))
             if cell_body.next_or_ip in self.or_sockets:
                 sock = self.or_sockets[cell_body.next_or_ip]
             else:
@@ -449,6 +493,9 @@ class OnionRouter:
         # Add onion layer
         circuit_state = self.circuits[circ_id]
         cell_body = add_onion_layer(cell_body, circuit_state.get_sesskey())
+
+        print("Added an onion layer, forwarding Relay to {} [{}]".format(
+            socket.inet_ntoa(circuit_state.ip_addresses[0]), socket.inet_ntoa(get_country(circuit_state.ip_addresses[0]))))
 
         # Create header
         hdr = CellHeader(THOR_VERSION, CellType.RelayExtended,
