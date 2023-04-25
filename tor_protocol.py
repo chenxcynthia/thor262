@@ -5,6 +5,7 @@ from nacl.encoding import RawEncoder
 from nacl.utils import random
 import socket
 from typing import List
+import requests  # For geolocating
 
 THOR_VERSION = 1
 THOR_PORT = 50051
@@ -49,6 +50,14 @@ def recv_all(sock: socket.socket, length: int) -> bytes:
                 break
         data += chunk
     return data
+
+
+def get_country(ip: str) -> str:
+    data = requests.get("https://ipinfo.io/{}/json".format(ip)).json()
+    if "country" not in data:
+        return None
+    else:
+        return data["country"]
 
 
 class CellType(IntEnum):

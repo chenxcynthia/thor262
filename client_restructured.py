@@ -18,7 +18,8 @@ class TorClient:
         self.stage = 0  # which onion router in the circuit the client is making
 
     def retrieve_onion_routers(self):
-        print("Connecting to DS at %s" % self.ds_ip)
+        print("Connecting to DS at %s in %s" %
+              (self.ds_ip, get_country(self.ds_ip)))
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect((self.ds_ip, THOR_PORT))
 
@@ -53,7 +54,8 @@ class TorClient:
         sk = PrivateKey.generate()
         pk = sk.public_key
 
-        print("Extending the circuit to OR %d at %s" % (self.stage + 1, ip))
+        print("Extending the circuit to OR %d at %s in %s" %
+              (self.stage + 1, ip, get_country(ip)))
 
         # making the first onion router
         if self.stage == 0:
