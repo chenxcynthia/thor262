@@ -1,5 +1,5 @@
-# Tor262
-Distributed system implementation of Tor
+# Thor: The _Harvard_ Onion Router
+A distributed system implementation of Tor with peer-to-peer encrypted communication
 
 Contributors: @[darkwood101](https://github.com/darkwood101/), @[cynthia9chen](https://github.com/cynthia9chen)
 
@@ -16,21 +16,21 @@ Tor262 is a distributed systems implementation of The Onion Router, widely known
 
 Overall system design:
 <!-- ![SystemDesign](diagrams/SystemDesign.png | width=180) -->
-<img src="diagrams/SystemDesign.png" width="500">
+<img src="diagrams/SystemDesign.png" width="800">
 
 
-Establishing the 3rd onion router:
+Diagram explaining how the 3rd onion router is established using various message types:
 <!-- ![OR3_establish](diagrams/OR3_establish.png | width=180px)-->
-<img src="diagrams/OR3_establish.png" width="500">
+<img src="diagrams/OR3_establish.png" width="800">
 
 
-## 2. Running Tor262 locally
+## 3. Running Tor262 locally
 Generate key file:
 ```console
 $ python3 generate_signing_key.py test.key
 ```
 
-Start up 3 ORs (in 3 terminal windows):
+Start up the three ORs (in separate terminal windows):
 ```
 $ python3 onion_router.py 127.0.0.1 50051 test.key
 $ python3 onion_router.py 127.0.0.2 50051 test.key
@@ -58,12 +58,9 @@ OR 3 signature: b'XSVz/J7OopjH0LODExPfOpll2HWgTiUANxoyU/WbbasxcHr8QE0E9Tc43FOmxv
 My hash of OR 3 session key: b'Ce7kp0Q1t+xib2SI6932XKwJHMBLDYVt08b2eEt1jM4='
 ```
 
-"OR 1 hash of the session key" must match "My hash of OR 1 session key". Same for OR 2 and OR 3.
-
-## 3. Implementation
-
+"OR 1 hash of the session key" should match "My hash of OR 1 session key". The same goes for OR 2 and OR 3.
 
 
 ## 4. Real-World Application
 
-
+ChatGPT is currently blocked in Italy. We use Thor to circumvent this ban by setting up onion routers hosted on international AWS instances and using the third onion router to establish a TCP connection with https://chat.openai.com using the ChatGPT API.
