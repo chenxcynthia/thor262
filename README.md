@@ -16,17 +16,17 @@ Thor262 is a distributed systems implementation of The Onion Router, widely know
 
 We define our own wire protocol for all messages exchanged between Thor participants. We maintain a directory server (DS) that manages a dynamic list of onion routers (ORs). We implement fault detection—the DS is able to detect fail-stop failures of any onion routers through heartbeat messages—and new onion routers can also join the network by sending a message to the directory server. 
 
-Overall system design:
+**Overall system design:**
 
 <img src="diagrams/SystemDesign.png" width="700">
 
 When a client establishes a connection with the DS, it is given the IP addresses of three onion routers with which it establishes a circuit with. We maintain encrypted communication between client and onion routers through various message types in the form of control cells (Create, Created, Destroy) and relay cells: Extend, Extended, Begin, Data, End). The diagram below explains how the 3rd onion router is established using these message types. Finally, the last onion router (typically OR3) in the circuit establishes a TCP connection with the given destination website <hostname, port> (usually HTTP(S)).
 
-Diagram explaining how the 3rd onion router is established using various message types:
+**Diagram explaining how the 3rd onion router is established using various message types:**
 
 <img src="diagrams/OR3_establish.png" width="700">
 
-Encrypted communication:
+**Encrypted communication:**
 - Mix of asymmetric and symmetric cryptography
 - The directory server has a long-term private/public keypair — public key is well-known and is the root for our chain of trust
 - ORs have a long-term private/public keypair for signatures – public keys are verified and signed by DS
