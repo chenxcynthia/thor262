@@ -15,13 +15,13 @@ Tor262 is a distributed systems implementation of The Onion Router, widely known
 ## 2. System Design
 
 Overall system design:
-![SystemDesign](diagrams/SystemDesign.png | width=180)
-<img src="diagrams/SystemDesign.png" width="48">
+<!-- ![SystemDesign](diagrams/SystemDesign.png | width=180) -->
+<img src="diagrams/SystemDesign.png" width="500">
 
 
 Establishing the 3rd onion router:
-![OR3_establish](diagrams/OR3_establish.png | width=180px)
-
+<!-- ![OR3_establish](diagrams/OR3_establish.png | width=180px)-->
+<img src="diagrams/OR3_establish.png" width="500">
 
 
 ## 2. Running Tor262 locally
