@@ -1,5 +1,5 @@
 # Thor: The _Harvard_ Onion Router
-A distributed system implementation of Tor with peer-to-peer encrypted communication.
+A distributed system implementation of Tor with encrypted peer-to-peer communication.
 
 Contributors: [@darkwood101](https://github.com/darkwood101/), [@cynthia9chen](https://github.com/cynthia9chen)
 
