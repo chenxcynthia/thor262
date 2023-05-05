@@ -2,7 +2,7 @@ import socket
 import ssl
 import sys
 import json
-from client_restructured import TorClient
+from client import TorClient
 from nacl.signing import VerifyKey
 from tor_protocol import *
 from random import sample
