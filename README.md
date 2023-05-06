@@ -3,10 +3,13 @@ A distributed system implementation of Tor with encrypted peer-to-peer communica
 
 Contributors: [@darkwood101](https://github.com/darkwood101/), [@cynthia9chen](https://github.com/cynthia9chen)
 
-1. [Background](#1-background)
-2. [System Design](#2-system-design)
-3. [Running Tor262](#3-Running-Tor262)
-4. [Real-World Application](#4-Real-World-Application)
+- [1. Background](#1-background)
+- [2. System Design](#2-system-design)
+- [3. Running Thor](#3-running-thor)
+  - [3.1. Starting a DS](#31-starting-a-ds)
+  - [3.2. Starting an OR](#32-starting-an-or)
+  - [3.3. ChatGPT client](#33-chatgpt-client)
+- [4. Real-World Application](#4-real-world-application)
 
 ## 1. Background
 
@@ -33,42 +36,47 @@ When a client establishes a connection with the DS, it is given the IP addresses
 - Client and ORs negotiate temporary secret keys during circuit creation
 
 
-## 3. Running Tor262 locally
-Generate key file:
+## 3. Running Thor
+
+### 3.1. Starting a DS
+
+Generate private key file for the DS:
 ```console
-$ python3 generate_signing_key.py test.key
+$ python3 generate_signing_key.py <DS PRIVATE KEY FILE>
+```
+Get the corresponding public key:
+```console
+$ generate_public_key.py <DS PRIVATE KEY FILE> <DS PUBLIC KEY FILE>
+```
+Make sure that the output DS public key file is distributed to any ORs or clients.
+
+Start a DS:
+```console
+$ python3 directory_server.py <DS PRIVATE KEY FILE>
+```
+The DS will bind to all addresses on the machine.
+
+### 3.2. Starting an OR
+
+Generate private key file for the OR:
+```console
+$ python3 generate_signing_key.py <OR PRIVATE KEY FILE>
 ```
 
-Start up the three ORs (in separate terminal windows):
+Start an OR:
+```console
+$ python3 onion_router.py <DS IP ADDRESS> <DS PUBLIC KEY FILE> <OR PRIVATE KEY FILE>
 ```
-$ python3 onion_router.py 127.0.0.1 50051 test.key
-$ python3 onion_router.py 127.0.0.2 50051 test.key
-$ python3 onion_router.py 127.0.0.3 50051 test.key
-```
+The OR will attempt to join the network administered by the DS at the given IP address with the given public key.
 
-In the 4th terminal window, start the client:
-```
-$ python3 client.py
-```
 
-Sample client output:
-```
-OR 1 public key: b'4nX1LOdIt58fArZZW7VzHTwy0oXzzIA+x2TOK1AZ31A='
-OR 1 hash of the session key: b'YHFSrnMw5CA2jw3NibhMqq7lcHPSnWQTez7FYcO3OhU='
-OR 1 signature: b'V4YHx+nHbtN9Cc28fcM/gsDbiucwGDu451a60uUW95yRu9PU7HVpS2Nga5eczlwJptnYfx0f6uFpscRYPphcDA=='
-My hash of OR 1 session key: b'YHFSrnMw5CA2jw3NibhMqq7lcHPSnWQTez7FYcO3OhU='
-OR 2 public key: b'l/PFCyaEbQ4qfyLpm0I5kP05lhuUNwfHXF47yYBRtzs='
-OR 2 hash of the session key: b'g3UqQqyFXd986OP5kORiL3156FAj1MZXmYDbrKFfwTU='
-OR 2 signature: b'bnZyPzSMpnsTYjgnpKUW7+9sTb+IBPgsf6YwHO1SpHv2yfU9NhgpaY3yek6pO+y0bgP1Axi16FtHNmEdhPRLCw=='
-My hash of OR 2 session key: b'g3UqQqyFXd986OP5kORiL3156FAj1MZXmYDbrKFfwTU='
-OR 3 public key: b'a9XElfCnjltaT2LESYlznyF9/bGHHU0kMq2tZ4i2jUU='
-OR 3 hash of the session key: b'Ce7kp0Q1t+xib2SI6932XKwJHMBLDYVt08b2eEt1jM4='
-OR 3 signature: b'XSVz/J7OopjH0LODExPfOpll2HWgTiUANxoyU/WbbasxcHr8QE0E9Tc43FOmxvGv+4rJYvOujf+gDsW4zB5GAA=='
-My hash of OR 3 session key: b'Ce7kp0Q1t+xib2SI6932XKwJHMBLDYVt08b2eEt1jM4='
-```
+### 3.3. ChatGPT client
 
-"OR 1 hash of the session key" should match "My hash of OR 1 session key". The same goes for OR 2 and OR 3.
-
+To connect to OpenAI API using Thor, first make sure you have a DS running and at least 3 ORs. You will also need an OpenAI API key. Then run the following:
+```console
+$ python3 chatgpt_client.py <OPENAI API KEY FILE> USETOR <DS PUBLIC KEY FILE> <DS IP ADDRESS>
+```
+The client will establish a circuit using the OR information received from the DS, and then connect to OpenAI API through the circuit.
 
 ## 4. Real-World Application
 
