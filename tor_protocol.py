@@ -51,7 +51,9 @@ def recv_all(sock: socket.socket, length: int) -> bytes:
         data += chunk
     return data
 
+
 g_countries: Dict[str, str] = {None: None}
+
 
 def get_country(ip: str) -> str:
     global g_countries
