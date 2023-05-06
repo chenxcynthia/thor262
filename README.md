@@ -9,7 +9,8 @@ Contributors: [@darkwood101](https://github.com/darkwood101/), [@cynthia9chen](h
   - [3.1. Starting a DS](#31-starting-a-ds)
   - [3.2. Starting an OR](#32-starting-an-or)
   - [3.3. ChatGPT client](#33-chatgpt-client)
-- [4. Real-World Application](#4-real-world-application)
+- [4. Tests](#4-tests)
+- [5. Real-World Application](#5-real-world-application)
 
 ## 1. Background
 
@@ -78,6 +79,13 @@ $ python3 chatgpt_client.py <OPENAI API KEY FILE> USETOR <DS PUBLIC KEY FILE> <D
 ```
 The client will establish a circuit using the OR information received from the DS, and then connect to OpenAI API through the circuit.
 
-## 4. Real-World Application
+## 4. Tests
+
+Run tests:
+```console
+$ python3 test_protocol.py
+```
+
+## 5. Real-World Application
 
 ChatGPT is currently blocked in Italy. We use Thor to circumvent this ban by setting up onion routers hosted on international AWS instances and using the third onion router to establish a TCP connection with https://chat.openai.com using the ChatGPT API.
