@@ -24,7 +24,7 @@ We define our own wire protocol for all messages exchanged between Thor particip
 
 <img src="diagrams/SystemDesign.png" width="700">
 
-When a client establishes a connection with the DS, it is given the IP addresses of three onion routers with which it establishes a circuit with. We maintain encrypted communication between client and onion routers through various message types in the form of control cells (Create, Created, Destroy) and relay cells: Extend, Extended, Begin, Data, End). The diagram below explains how the 3rd onion router is established using these message types. Finally, the last onion router (typically OR3) in the circuit establishes a TCP connection with the given destination website <hostname, port> (usually HTTP(S)).
+When a client establishes a connection with the DS, it is given the IP addresses of three onion routers with which it establishes a circuit with. We maintain encrypted communication between client and onion routers through various message types in the form of control cells (Create, Created, Destroy) and relay cells: Extend, Extended, Begin, Data, End. The diagram below explains how the 3rd onion router is established using these message types. Finally, the last onion router (typically OR3) in the circuit establishes a TCP connection with the given destination website <hostname, port> (usually HTTP(S)).
 
 **Diagram explaining how the 3rd onion router is established using various message types:**
 
